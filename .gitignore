@@ -1,0 +1,30 @@
+# Node
+node_modules/
+dist/
+coverage/
+
+# Env secrets — never commit
+.env.development
+.env.local
+.env.*.local
+reviewboost-backend/.env.development
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+reviewboost-outreach/logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/
+.idea/
+
+# Logs
+*.log
+logs/

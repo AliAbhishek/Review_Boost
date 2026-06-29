@@ -1,0 +1,7 @@
+{
+  "watch": ["src"],
+  "ext": "ts,json",
+  "ignore": ["src/**/*.test.ts", "dist"],
+  "exec": "cross-env NODE_ENV=development ts-node --transpile-only src/app.ts",
+  "delay": 500
+}
