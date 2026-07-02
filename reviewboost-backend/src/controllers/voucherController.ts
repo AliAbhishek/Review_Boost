@@ -5,12 +5,13 @@ import { AppError } from '../utils/AppError';
 import { asyncHandler } from '../utils/asyncHandler';
 
 export const upsertVoucherSchema = z.object({
-  isActive:     z.boolean().default(true),
-  title:        z.string().min(1).max(100),
-  discountText: z.string().min(1).max(50),
-  description:  z.string().max(200).optional(),
-  code:         z.string().min(1).max(30).toUpperCase(),
-  expiryDays:   z.number().int().min(1).max(365).default(30),
+  isActive:        z.boolean().default(true),
+  title:           z.string().min(1).max(100),
+  discountText:    z.string().min(1).max(50),
+  description:     z.string().max(200).optional(),
+  code:            z.string().min(1).max(30).toUpperCase(),
+  discountPercent: z.number().int().min(1).max(100).default(10),
+  expiryDays:      z.number().int().min(1).max(365).default(30),
 });
 
 export const getVoucher = asyncHandler(async (req: Request, res: Response) => {

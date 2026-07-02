@@ -9,9 +9,9 @@ export const reviewApi = {
       .get<{ status: string; data: { restaurant: Restaurant } }>(`/api/review/${slug}`)
       .then((r) => r.data.data.restaurant),
 
-  generateReviews: (slug: string, stars: number) =>
+  generateReviews: (slug: string, stars: number, token?: string) =>
     publicClient
-      .post<{ status: string; data: GenerateReviewsResponse }>(`/api/review/generate`, { slug, stars })
+      .post<{ status: string; data: GenerateReviewsResponse }>(`/api/review/generate`, { slug, stars, ...(token && { token }) })
       .then((r) => r.data.data),
 
   logReview: (data: ReviewLogPayload & { token?: string }) =>

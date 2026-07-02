@@ -22,6 +22,15 @@ export const updateProfileSchema = z.object({
   zomatoUrl:       z.string().url().optional().or(z.literal('')),
   logoColor:     z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
   ownerPhone:    z.string().min(7).max(20).optional(),
+  taxConfig: z.object({
+    gstEnabled:           z.boolean(),
+    cgst:                 z.number().min(0).max(50),
+    sgst:                 z.number().min(0).max(50),
+    useIgst:              z.boolean(),
+    igst:                 z.number().min(0).max(50),
+    serviceChargeEnabled: z.boolean(),
+    serviceCharge:        z.number().min(0).max(50),
+  }).optional(),
 });
 
 export const getOwnerStats = asyncHandler(async (req: Request, res: Response) => {

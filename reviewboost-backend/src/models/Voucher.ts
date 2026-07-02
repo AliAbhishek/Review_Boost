@@ -6,7 +6,8 @@ export interface IVoucher {
   title: string;       // "10% off your next visit"
   discountText: string; // "10% OFF" or "Free Coffee"
   description: string;  // "Show this to the staff"
-  code: string;         // "THANKS10"
+  code: string;            // "THANKS10"
+  discountPercent: number; // machine-readable, e.g. 10 for 10%
   expiryDays: number;
   claimedCount: number;
   createdAt: Date;
@@ -24,8 +25,9 @@ const VoucherSchema = new Schema<IVoucherDocument>(
     title:        { type: String, required: true },
     discountText: { type: String, required: true },
     description:  { type: String, default: 'Show this to the staff on your next visit' },
-    code:         { type: String, required: true },
-    expiryDays:   { type: Number, default: 30 },
+    code:            { type: String, required: true },
+    discountPercent: { type: Number, required: true, min: 1, max: 100, default: 10 },
+    expiryDays:      { type: Number, default: 30 },
     claimedCount: { type: Number, default: 0 },
   },
   { timestamps: true },

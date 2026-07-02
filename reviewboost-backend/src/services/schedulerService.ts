@@ -3,14 +3,17 @@ import crypto from 'crypto';
 import { Customer } from '../models/Customer';
 import { Restaurant } from '../models/Restaurant';
 import { sendReviewRequestEmail } from './emailService';
+import { sendWA } from './whatsappService';
+import { reviewRequestWA } from './whatsappMessages';
+import { env } from '../config/env';
 import { logger } from '../utils/logger';
 
 async function processFollowUpEmails() {
-  const threeHoursAgo = new Date(Date.now() - 3 * 60 * 60 * 1000);
+  const delay = new Date(Date.now() - 3 * 60 * 60 * 1000);
 
   const pending = await Customer.find({
     emailSentAt: { $exists: false },
-    visitDate:   { $lte: threeHoursAgo },
+    visitDate:   { $lte: delay },
   }).lean();
 
   if (pending.length === 0) return;
@@ -29,9 +32,14 @@ async function processFollowUpEmails() {
         emailToken:  token,
       });
 
-      await sendReviewRequestEmail(customer.name, customer.email, restaurant.name, restaurant.slug, token);
-
-      logger.info(`[Scheduler] Follow-up sent to ${customer.email} for "${restaurant.name}"`);
+      const reviewUrl = `${env.FRONTEND_URL}/r/${restaurant.slug}?token=${token}`;
+      sendReviewRequestEmail(customer.name, customer.email, restaurant.name, restaurant.slug, token);
+      sendWA(
+        restaurant._id.toString(),
+        customer.phone,
+        reviewRequestWA(customer.name, restaurant.name, reviewUrl),
+      );
+      logger.info(`[Scheduler] Queued follow-up for ${customer.email} at "${restaurant.name}"`);
     } catch (err) {
       logger.error(`[Scheduler] Failed for customer ${customer._id}: ${String(err)}`);
     }
@@ -39,7 +47,6 @@ async function processFollowUpEmails() {
 }
 
 export function startScheduler() {
-  // Run every 30 minutes
   cron.schedule('*/30 * * * *', () => {
     processFollowUpEmails().catch((err) =>
       logger.error(`[Scheduler] Unhandled error: ${String(err)}`),
@@ -51,5 +58,5 @@ export function startScheduler() {
     logger.error(`[Scheduler] Startup run failed: ${String(err)}`),
   );
 
-  logger.info('[Scheduler] Email follow-up scheduler started (runs every 30 min)');
+  logger.info('[Scheduler] Email follow-up scheduler started (runs every 30 min, 3h delay)');
 }

@@ -25,3 +25,6 @@ coverage/
 
 # PM2
 .pm2/
+
+# WhatsApp session auth — contains private keys, never commit
+whatsapp-sessions/

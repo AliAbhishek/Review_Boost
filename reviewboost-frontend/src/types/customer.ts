@@ -5,6 +5,7 @@ export interface Customer {
   email: string
   phone?: string
   visitDate: string
+  orderedItems?: string
   notes?: string
   emailSentAt?: string
   emailToken?: string
@@ -19,6 +20,7 @@ export interface AddCustomerDto {
   email: string
   phone?: string
   visitDate: string
+  orderedItems?: string
   notes?: string
 }
 

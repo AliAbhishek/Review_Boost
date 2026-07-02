@@ -52,9 +52,9 @@ function getClient(): Anthropic {
   return anthropicClient;
 }
 
-function buildPrompt(restaurant: IRestaurant, stars: number): string {
+function buildPrompt(restaurant: IRestaurant, stars: number, orderedItems?: string): string {
   const config = BUSINESS_CONFIG[restaurant.businessType] ?? BUSINESS_CONFIG.other;
-  const serviceList = restaurant.services.slice(0, 3).join(', ');
+  const itemsToMention = orderedItems?.trim() || '';
   const lowRating = stars <= 3;
 
   return `You are helping a customer write a genuine review for a ${config.label}.
@@ -62,7 +62,7 @@ function buildPrompt(restaurant: IRestaurant, stars: number): string {
 Business details:
 - Name: ${restaurant.name}
 - Type: ${config.label}
-${serviceList ? `- Top ${config.serviceLabel}: ${serviceList}` : ''}
+${itemsToMention ? `- What this customer ordered: ${itemsToMention}` : ''}
 ${restaurant.description ? `- About: ${restaurant.description}` : ''}
 - Rating given: ${stars}/5 stars
 
@@ -84,7 +84,7 @@ Generate exactly 3 review options in the following JSON format. Return ONLY vali
 
 Rules:
 - Each review must sound like a real human wrote it — vary sentence structure, avoid corporate language
-${serviceList ? `- Mention at least one specific item from the ${config.serviceLabel} list above` : ''}
+${itemsToMention ? `- Mention at least one specific item from what this customer ordered` : '- Do not mention specific dishes or items'}
 - ${lowRating ? `Since the rating is ${stars}/5, naturally weave in one genuine area for improvement without being harsh` : 'Keep the tone positive and enthusiastic'}
 - Do NOT mention ReviewBoost, AI, or review generation
 - Vary the vocabulary and tone across all three styles`;
@@ -93,8 +93,9 @@ ${serviceList ? `- Mention at least one specific item from the ${config.serviceL
 export async function generateReviews(
   restaurant: IRestaurant,
   stars: number,
+  orderedItems?: string,
 ): Promise<ReviewOption[]> {
-  const prompt = buildPrompt(restaurant, stars);
+  const prompt = buildPrompt(restaurant, stars, orderedItems);
   const client = getClient();
 
   let message: Awaited<ReturnType<typeof client.messages.create>>;

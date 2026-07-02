@@ -11,6 +11,16 @@ export const BUSINESS_CONFIG: Record<BusinessType, { label: string; question: st
   other:      { label: 'Business',   question: 'How was your experience?',  serviceLabel: 'Services'   },
 }
 
+export interface TaxConfig {
+  gstEnabled: boolean
+  cgst: number
+  sgst: number
+  useIgst: boolean
+  igst: number
+  serviceChargeEnabled: boolean
+  serviceCharge: number
+}
+
 export interface Restaurant {
   _id: string
   name: string
@@ -25,6 +35,7 @@ export interface Restaurant {
   googleReviewUrl?: string
   zomatoUrl?: string
   logoColor: string
+  taxConfig?: TaxConfig
   plan: 'trial' | 'basic' | 'pro'
   isActive: boolean
   createdAt: string
@@ -51,6 +62,7 @@ export interface UpdateRestaurantDto {
   zomatoUrl?: string
   logoColor?: string
   ownerPhone?: string
+  taxConfig?: TaxConfig
   plan?: 'trial' | 'basic' | 'pro'
   isActive?: boolean
 }

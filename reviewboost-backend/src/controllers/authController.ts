@@ -33,7 +33,7 @@ export const register = asyncHandler(async (req: Request, res: Response) => {
   const passwordHash = await bcrypt.hash(password, 12);
   const owner = await Owner.create({ name, email, passwordHash, restaurantId: restaurant._id });
 
-  await sendWelcomeEmail(email, name, restaurant.name);
+  sendWelcomeEmail(email, name, restaurant.name);
 
   const token = signOwnerToken(owner._id, restaurant._id);
 

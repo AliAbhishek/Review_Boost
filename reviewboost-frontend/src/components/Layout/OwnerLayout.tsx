@@ -1,16 +1,19 @@
 import { motion } from 'framer-motion'
-import { LogOut, Zap, BarChart2, Star, Users, Gift, Settings } from 'lucide-react'
+import { LogOut, Zap, BarChart2, Star, Users, Gift, Settings, UtensilsCrossed, Receipt, TrendingUp } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { cn } from '@/utils/cn'
 import { useAuthStore } from '@/store/authStore'
 import { useNavigate } from 'react-router-dom'
 
 export const OWNER_TABS = [
-  { id: 'overview',  label: 'Overview',   icon: BarChart2 },
-  { id: 'reviews',   label: 'Reviews',    icon: Star      },
-  { id: 'customers', label: 'Customers',  icon: Users     },
-  { id: 'voucher',   label: 'Voucher',    icon: Gift      },
-  { id: 'profile',   label: 'Profile',    icon: Settings  },
+  { id: 'overview',  label: 'Overview',   icon: BarChart2       },
+  { id: 'sales',     label: 'Sales',      icon: TrendingUp      },
+  { id: 'billing',   label: 'Billing',    icon: Receipt         },
+  { id: 'menu',      label: 'Menu',       icon: UtensilsCrossed },
+  { id: 'reviews',   label: 'Reviews',    icon: Star            },
+  { id: 'customers', label: 'Customers',  icon: Users           },
+  { id: 'voucher',   label: 'Voucher',    icon: Gift            },
+  { id: 'profile',   label: 'Profile',    icon: Settings        },
 ] as const
 
 export type OwnerTabId = (typeof OWNER_TABS)[number]['id']

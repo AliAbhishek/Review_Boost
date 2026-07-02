@@ -15,8 +15,12 @@ import qrRouter from './routes/qr';
 import ownerRouter from './routes/owner';
 import customerRouter from './routes/customer';
 import voucherRouter from './routes/voucher';
+import menuRouter from './routes/menu';
+import billRouter from './routes/bill';
 import publicRouter from './routes/public';
+import whatsappRouter from './routes/whatsapp';
 import { startScheduler } from './services/schedulerService';
+import { initializeExistingSessions } from './services/whatsappService';
 import { errorHandler } from './middleware/errorHandler';
 import { requestId } from './middleware/requestId';
 import { responseHandler } from './middleware/responseHandler';
@@ -98,7 +102,10 @@ app.use('/api/qr', qrRouter);
 app.use('/api/owner', ownerRouter);
 app.use('/api/customers', customerRouter);
 app.use('/api/voucher', voucherRouter);
-app.use('/api/public', publicRouter);
+app.use('/api/menu', menuRouter);
+app.use('/api/bills', billRouter);
+app.use('/api/public',    publicRouter);
+app.use('/api/whatsapp', whatsappRouter);
 
 // ─── 404 handler ──────────────────────────────────────────────────────────────
 app.use((_req, _res, next) => {
@@ -117,6 +124,9 @@ if (require.main === module) {
         logger.info(`ReviewBoost API — port ${env.PORT} [${env.NODE_ENV}]`);
       });
       startScheduler();
+      initializeExistingSessions().catch((err: Error) =>
+        logger.error('WhatsApp session restore failed', err),
+      );
       registerShutdownHandlers(server);
     })
     .catch((err: Error) => {

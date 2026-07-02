@@ -1,18 +1,24 @@
 import { Request, Response } from 'express';
 import { z } from 'zod';
+import crypto from 'crypto';
 import { Restaurant } from '../models/Restaurant';
 import { ReviewLog } from '../models/ReviewLog';
-import { Customer } from '../models/Customer';
+import { Customer, type ICustomerDocument } from '../models/Customer';
+import { Bill } from '../models/Bill';
 import { Voucher } from '../models/Voucher';
+import { VoucherRedemption } from '../models/VoucherRedemption';
 import { AppError } from '../utils/AppError';
 import { asyncHandler } from '../utils/asyncHandler';
 import { generateReviews } from '../services/aiService';
-import { sendPrivateReviewAlert } from '../services/emailService';
+import { sendPrivateReviewAlert, sendVoucherEmail } from '../services/emailService';
+import { sendWA } from '../services/whatsappService';
+import { voucherWA } from '../services/whatsappMessages';
 import { logger } from '../utils/logger';
 
 export const generateReviewSchema = z.object({
-  slug: z.string().min(1),
+  slug:  z.string().min(1),
   stars: z.number().int().min(1).max(5),
+  token: z.string().optional(),
 });
 
 export const logReviewSchema = z.object({
@@ -37,12 +43,19 @@ export const getRestaurantPublic = asyncHandler(async (req: Request, res: Respon
 
 /** Calls Claude and returns 3 AI-generated review options. */
 export const generateReviewOptions = asyncHandler(async (req: Request, res: Response) => {
-  const { slug, stars } = req.body as z.infer<typeof generateReviewSchema>;
+  const { slug, stars, token } = req.body as z.infer<typeof generateReviewSchema>;
 
   const restaurant = await Restaurant.findOne({ slug, isActive: true });
   if (!restaurant) throw new AppError('Restaurant not found', 404);
 
-  const reviews = await generateReviews(restaurant, stars);
+  // If the customer arrived via email link, use what the owner recorded they ordered
+  let orderedItems: string | undefined;
+  if (token) {
+    const customer = await Customer.findOne({ emailToken: token, restaurantId: restaurant._id }).lean();
+    orderedItems = customer?.orderedItems ?? undefined;
+  }
+
+  const reviews = await generateReviews(restaurant, stars, orderedItems);
 
   res.success({ reviews });
 });
@@ -63,11 +76,7 @@ export const logReview = asyncHandler(async (req: Request, res: Response) => {
     req.socket.remoteAddress;
 
   const submittedTo: 'google' | 'zomato' | 'private' =
-    stars <= 2
-      ? 'private'
-      : restaurant.zomatoUrl && Math.random() < 0.5
-        ? 'zomato'
-        : 'google';
+    stars <= 2 ? 'private' : 'google';
 
   const reviewLog = await ReviewLog.create({
     restaurantId: restaurant._id,
@@ -78,22 +87,74 @@ export const logReview = asyncHandler(async (req: Request, res: Response) => {
     customerIp,
   });
 
-  // Mark the customer as reviewed if they arrived via email campaign
+  // Mark the customer as reviewed + mark the specific bill reviewed via token
+  let customer: ICustomerDocument | null = null;
   if (token) {
-    Customer.findOneAndUpdate(
-      { emailToken: token, restaurantId: restaurant._id },
-      { reviewedAt: new Date() },
-    ).catch((err) => logger.error(`Failed to mark customer reviewed: ${String(err)}`));
+    const now = new Date();
+    [customer] = await Promise.all([
+      Customer.findOneAndUpdate(
+        { emailToken: token, restaurantId: restaurant._id },
+        { reviewedAt: now },
+        { new: true },
+      ),
+      Bill.findOneAndUpdate(
+        { emailToken: token, restaurantId: restaurant._id },
+        { reviewedAt: now },
+      ),
+    ]);
   }
 
   if (submittedTo === 'private') {
-    sendPrivateReviewAlert(restaurant.ownerEmail, stars, reviewText).catch((err) =>
-      logger.error(`Failed to send private review alert: ${String(err)}`),
-    );
+    sendPrivateReviewAlert(restaurant.ownerEmail, stars, reviewText);
   }
 
-  // Return active voucher so the frontend can show it on the thank-you screen
+  // Issue a personalized voucher redemption if restaurant has an active voucher
   const voucher = await Voucher.findOne({ restaurantId: restaurant._id, isActive: true }).lean();
+  let redemption = null;
 
-  res.created({ reviewLog, voucher: voucher ?? null });
+  if (voucher && customer?.email) {
+    // Generate a unique per-customer code: BASE_CODE-XXXX
+    const suffix = crypto.randomBytes(2).toString('hex').toUpperCase();
+    const code   = `${voucher.code}-${suffix}`;
+    const expiresAt = new Date(Date.now() + voucher.expiryDays * 24 * 60 * 60 * 1000);
+
+    try {
+      redemption = await VoucherRedemption.create({
+        restaurantId:    restaurant._id,
+        voucherId:       voucher._id,
+        customerId:      customer._id,
+        customerName:    customer.name,
+        customerEmail:   customer.email,
+        code,
+        discountPercent: voucher.discountPercent,
+        status:          'earned',
+        earnedAt:        new Date(),
+        expiresAt,
+      });
+
+      sendVoucherEmail(
+        customer.name,
+        customer.email,
+        restaurant.name,
+        restaurant.logoColor ?? '#6366f1',
+        code,
+        voucher.discountPercent,
+        voucher.discountText,
+        voucher.description,
+        expiresAt,
+      );
+
+      sendWA(
+        restaurant._id.toString(),
+        customer.phone,
+        voucherWA(customer.name, restaurant.name, code, voucher.discountPercent, voucher.discountText, expiresAt),
+      );
+
+      logger.info(`[Voucher] Issued ${code} to ${customer.email}`);
+    } catch (err) {
+      logger.error(`[Voucher] Failed to issue for ${customer.email}: ${String(err)}`);
+    }
+  }
+
+  res.created({ reviewLog, voucher: voucher ?? null, redemptionCode: redemption?.code ?? null });
 });

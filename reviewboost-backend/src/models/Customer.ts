@@ -6,6 +6,7 @@ export interface ICustomer {
   email: string;
   phone?: string;
   visitDate: Date;
+  orderedItems?: string;
   notes?: string;
   // Email campaign tracking
   emailSentAt?: Date;
@@ -28,6 +29,7 @@ const CustomerSchema = new Schema<ICustomerDocument>(
     email:           { type: String, required: true, lowercase: true, trim: true },
     phone:           { type: String },
     visitDate:       { type: Date, required: true },
+    orderedItems:    { type: String },
     notes:           { type: String },
     emailSentAt:     { type: Date },
     emailToken:      { type: String },

@@ -30,9 +30,7 @@ export const requestDemo = asyncHandler(async (req: Request, res: Response) => {
     plan: 'trial',
   });
 
-  sendOwnerInviteEmail(email, businessName, restaurant._id.toString()).catch((err) =>
-    logger.error('Failed to send demo invite email', { err, restaurantId: restaurant._id }),
-  );
+  sendOwnerInviteEmail(email, businessName, restaurant._id.toString());
 
   res.created({ message: 'Invite sent! Check your email to finish setting up your account.' });
 });

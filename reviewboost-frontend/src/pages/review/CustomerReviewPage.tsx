@@ -56,7 +56,7 @@ export default function CustomerReviewPage() {
     if (stars <= 2) { setStage('private-feedback'); return }
     setStage('loading')
     try {
-      const data = await reviewApi.generateReviews(slug ?? '', stars)
+      const data = await reviewApi.generateReviews(slug ?? '', stars, emailToken)
       setReviews(data.reviews)
       setStage('reviews')
     } catch {

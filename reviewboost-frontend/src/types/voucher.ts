@@ -6,6 +6,7 @@ export interface Voucher {
   discountText: string
   description: string
   code: string
+  discountPercent: number
   expiryDays: number
   claimedCount: number
   createdAt: string
@@ -18,5 +19,15 @@ export interface UpsertVoucherDto {
   discountText: string
   description?: string
   code: string
+  discountPercent: number
   expiryDays: number
+}
+
+export interface VoucherValidation {
+  valid: boolean
+  code: string
+  discountPercent: number
+  customerName: string
+  customerEmail: string
+  expiresAt: string
 }

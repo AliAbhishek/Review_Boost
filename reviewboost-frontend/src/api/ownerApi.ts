@@ -71,6 +71,16 @@ export const ownerApi = {
   deleteCustomer: (id: string) =>
     client.delete(`/api/customers/${id}`),
 
+  getCustomer: (id: string) =>
+    client
+      .get<{ status: string; data: { customer: import('@/types/customer').Customer; bills: import('@/types/bill').Bill[] } }>(`/api/customers/${id}`)
+      .then((r) => r.data.data),
+
+  sendReviewForBill: (customerId: string, billId?: string) =>
+    client
+      .post<{ status: string; data: { message: string } }>(`/api/customers/${customerId}/send-review`, { billId })
+      .then((r) => r.data.data),
+
   // ─── Voucher ─────────────────────────────────────────────────────────────────
   getVoucher: () =>
     client

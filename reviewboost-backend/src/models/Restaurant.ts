@@ -32,6 +32,15 @@ export interface IRestaurant {
   logoColor: string;
   ownerEmail: string;
   ownerPhone?: string;
+  taxConfig?: {
+    gstEnabled: boolean;
+    cgst: number;
+    sgst: number;
+    useIgst: boolean;
+    igst: number;
+    serviceChargeEnabled: boolean;
+    serviceCharge: number;
+  };
   plan: 'trial' | 'basic' | 'pro';
   trialEndsAt?: Date;
   isActive: boolean;
@@ -59,6 +68,15 @@ const RestaurantSchema = new Schema<IRestaurantDocument>(
     logoColor:    { type: String, default: '#6366f1' },
     ownerEmail:   { type: String, required: true, lowercase: true },
     ownerPhone:   { type: String },
+    taxConfig: {
+      gstEnabled:           { type: Boolean, default: false },
+      cgst:                 { type: Number, default: 2.5 },
+      sgst:                 { type: Number, default: 2.5 },
+      useIgst:              { type: Boolean, default: false },
+      igst:                 { type: Number, default: 5 },
+      serviceChargeEnabled: { type: Boolean, default: false },
+      serviceCharge:        { type: Number, default: 10 },
+    },
     plan:         { type: String, enum: ['trial', 'basic', 'pro'], default: 'trial' },
     trialEndsAt:  { type: Date },
     isActive:     { type: Boolean, default: true },

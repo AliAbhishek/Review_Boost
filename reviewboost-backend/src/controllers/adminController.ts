@@ -47,9 +47,7 @@ export const createRestaurant = asyncHandler(async (req: Request, res: Response)
     slug,
   });
 
-  sendOwnerInviteEmail(data.ownerEmail, data.name, restaurant._id.toString()).catch((err) =>
-    logger.error('Failed to send owner invite email', { err, restaurantId: restaurant._id }),
-  );
+  sendOwnerInviteEmail(data.ownerEmail, data.name, restaurant._id.toString());
 
   res.created({ restaurant });
 });
