@@ -30,6 +30,7 @@ export interface IRestaurant {
   googleReviewUrl?: string;
   zomatoUrl?: string;
   logoColor: string;
+  logoUrl?: string;
   ownerEmail: string;
   ownerPhone?: string;
   taxConfig?: {
@@ -44,6 +45,7 @@ export interface IRestaurant {
   plan: 'trial' | 'basic' | 'pro';
   trialEndsAt?: Date;
   isActive: boolean;
+  billingPin?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -66,6 +68,7 @@ const RestaurantSchema = new Schema<IRestaurantDocument>(
     googleReviewUrl: { type: String },
     zomatoUrl:       { type: String },
     logoColor:    { type: String, default: '#6366f1' },
+    logoUrl:      { type: String },
     ownerEmail:   { type: String, required: true, lowercase: true },
     ownerPhone:   { type: String },
     taxConfig: {
@@ -80,6 +83,7 @@ const RestaurantSchema = new Schema<IRestaurantDocument>(
     plan:         { type: String, enum: ['trial', 'basic', 'pro'], default: 'trial' },
     trialEndsAt:  { type: Date },
     isActive:     { type: Boolean, default: true },
+    billingPin:   { type: String, select: false },
   },
   { timestamps: true },
 );

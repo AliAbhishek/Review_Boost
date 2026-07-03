@@ -1,9 +1,13 @@
 import { Request, Response } from 'express';
 import { z } from 'zod';
+import bcrypt from 'bcryptjs';
+import QRCode from 'qrcode';
 import { Restaurant } from '../models/Restaurant';
 import { ReviewLog } from '../models/ReviewLog';
 import { AppError } from '../utils/AppError';
 import { asyncHandler } from '../utils/asyncHandler';
+import { uploadLogo, deleteLogo } from '../services/uploadService';
+import { env } from '../config/env';
 
 export const getOwnerProfile = asyncHandler(async (req: Request, res: Response) => {
   const restaurant = await Restaurant.findById(req.owner!.restaurantId).lean();
@@ -99,4 +103,69 @@ export const updateOwnerProfile = asyncHandler(async (req: Request, res: Respons
   if (!restaurant) throw new AppError('Restaurant not found', 404);
 
   res.success(restaurant);
+});
+
+export const uploadRestaurantLogo = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.file) throw new AppError('No file uploaded', 400);
+
+  const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+  if (!allowed.includes(req.file.mimetype)) {
+    throw new AppError('Only JPEG, PNG, WebP and GIF images are allowed', 400);
+  }
+  if (req.file.size > 5 * 1024 * 1024) {
+    throw new AppError('Image must be under 5 MB', 400);
+  }
+
+  const restaurantId = req.owner!.restaurantId.toString();
+  const logoUrl = await uploadLogo(req.file.buffer, restaurantId);
+
+  const restaurant = await Restaurant.findByIdAndUpdate(
+    restaurantId,
+    { $set: { logoUrl } },
+    { new: true },
+  );
+  if (!restaurant) throw new AppError('Restaurant not found', 404);
+
+  res.success({ logoUrl });
+});
+
+export const deleteRestaurantLogo = asyncHandler(async (req: Request, res: Response) => {
+  const restaurantId = req.owner!.restaurantId.toString();
+  await deleteLogo(restaurantId);
+  await Restaurant.findByIdAndUpdate(restaurantId, { $unset: { logoUrl: '' } });
+  res.success({ message: 'Logo removed' });
+});
+
+// ─── QR Code ─────────────────────────────────────────────────────────────────
+
+export const getReviewQR = asyncHandler(async (req: Request, res: Response) => {
+  const restaurant = await Restaurant.findById(req.owner!.restaurantId).lean();
+  if (!restaurant) throw new AppError('Restaurant not found', 404);
+
+  const reviewUrl = `${env.FRONTEND_URL}/r/${restaurant.slug}`;
+  const qrDataUrl = await QRCode.toDataURL(reviewUrl, {
+    width: 512,
+    margin: 2,
+    color: { dark: '#111827', light: '#ffffff' },
+  });
+
+  res.success({ qrDataUrl, reviewUrl, restaurantName: restaurant.name });
+});
+
+// ─── Billing PIN ─────────────────────────────────────────────────────────────
+
+export const setBillingPinSchema = z.object({
+  pin: z.string().regex(/^\d{6}$/, 'PIN must be exactly 6 digits'),
+});
+
+export const setBillingPin = asyncHandler(async (req: Request, res: Response) => {
+  const { pin } = req.body as z.infer<typeof setBillingPinSchema>;
+  const hashed = await bcrypt.hash(pin, 10);
+  await Restaurant.findByIdAndUpdate(req.owner!.restaurantId, { $set: { billingPin: hashed } });
+  res.success({ message: 'Billing PIN set' });
+});
+
+export const removeBillingPin = asyncHandler(async (req: Request, res: Response) => {
+  await Restaurant.findByIdAndUpdate(req.owner!.restaurantId, { $unset: { billingPin: '' } });
+  res.success({ message: 'Billing PIN removed' });
 });

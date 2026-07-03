@@ -43,9 +43,16 @@ export interface VoucherStats {
   redemptionRate: number
 }
 
+export interface ReviewConversionStats {
+  count: number
+  emailsSent: number
+  conversionRate: number
+}
+
 export interface AnalyticsData {
   summary: AnalyticsSummary
   vouchers: VoucherStats
+  reviews: ReviewConversionStats
   timeline: TimelinePoint[]
   leaderboard: LeaderboardItem[]
   period: { from: string; to: string }

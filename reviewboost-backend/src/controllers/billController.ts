@@ -12,6 +12,7 @@ import { sendReceiptEmail } from '../services/emailService';
 import { sendWA } from '../services/whatsappService';
 import { receiptWA } from '../services/whatsappMessages';
 import { Voucher } from '../models/Voucher';
+import { ReviewLog } from '../models/ReviewLog';
 import { logger } from '../utils/logger';
 import { env } from '../config/env';
 
@@ -202,6 +203,7 @@ export const createBill = asyncHandler(async (req: Request, res: Response) => {
       voucherTeaser,
       restaurant.slug,
       emailToken,
+      restaurant.logoUrl,
     );
 
     sendWA(
@@ -257,10 +259,12 @@ export const getAnalytics = asyncHandler(async (req: Request, res: Response) => 
     prevTo   = addMs(from, -1);
   }
 
-  const [bills, prevBills, voucherStats] = await Promise.all([
+  const [bills, prevBills, voucherStats, reviewsInPeriod, emailsSentInPeriod] = await Promise.all([
     Bill.find({ restaurantId, createdAt: { $gte: from, $lte: to } }).lean(),
     Bill.find({ restaurantId, createdAt: { $gte: prevFrom, $lte: prevTo } }).lean(),
     VoucherRedemption.find({ restaurantId, earnedAt: { $gte: from, $lte: to } }).lean(),
+    ReviewLog.countDocuments({ restaurantId, timestamp: { $gte: from, $lte: to } }),
+    Customer.countDocuments({ restaurantId, emailSentAt: { $gte: from, $lte: to } }),
   ]);
 
   // ── Summary ────────────────────────────────────────────────────────────────
@@ -334,6 +338,10 @@ export const getAnalytics = asyncHandler(async (req: Request, res: Response) => 
   const vouchersRedeemed = voucherStats.filter((v) => v.status === 'used').length;
   const totalVoucherDiscount = bills.reduce((s, b) => s + (b.voucherApplied?.discountAmount ?? 0), 0);
 
+  const conversionRate = emailsSentInPeriod > 0
+    ? Math.round((reviewsInPeriod / emailsSentInPeriod) * 100)
+    : 0;
+
   res.success({
     summary: { totalRevenue, totalBills, avgOrder, totalItems, prevRevenue, prevBills: prevTotal },
     vouchers: {
@@ -342,6 +350,11 @@ export const getAnalytics = asyncHandler(async (req: Request, res: Response) => 
       pending:         vouchersIssued - vouchersRedeemed,
       totalDiscount:   Math.round(totalVoucherDiscount * 100) / 100,
       redemptionRate:  vouchersIssued ? Math.round((vouchersRedeemed / vouchersIssued) * 100) : 0,
+    },
+    reviews: {
+      count:          reviewsInPeriod,
+      emailsSent:     emailsSentInPeriod,
+      conversionRate,
     },
     timeline,
     leaderboard,

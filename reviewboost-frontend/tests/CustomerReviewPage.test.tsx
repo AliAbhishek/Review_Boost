@@ -50,8 +50,8 @@ describe('CustomerReviewPage', () => {
     vi.clearAllMocks()
     vi.spyOn(reviewApi.reviewApi, 'getRestaurant').mockResolvedValue(mockRestaurant)
     vi.spyOn(reviewApi.reviewApi, 'generateReviews').mockResolvedValue(mockReviews)
-    vi.spyOn(reviewApi.reviewApi, 'logReview').mockResolvedValue({ reviewLog: mockReviewLog, voucher: null })
-    vi.spyOn(reviewApi.reviewApi, 'submitPrivateFeedback').mockResolvedValue({ reviewLog: mockReviewLog, voucher: null })
+    vi.spyOn(reviewApi.reviewApi, 'logReview').mockResolvedValue({ reviewLog: mockReviewLog, voucher: null, redemptionCode: null })
+    vi.spyOn(reviewApi.reviewApi, 'submitPrivateFeedback').mockResolvedValue({ reviewLog: mockReviewLog, voucher: null, redemptionCode: null })
   })
 
   it('renders restaurant name after loading', async () => {

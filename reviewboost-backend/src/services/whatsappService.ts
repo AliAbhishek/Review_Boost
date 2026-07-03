@@ -17,11 +17,16 @@ const sessions = new Map<string, WASession>();
 const AUTH_DIR  = path.join(process.cwd(), 'whatsapp-sessions');
 const waLog     = P({ level: 'silent' });
 
-// Cache so baileys is only dynamically imported once
+// TypeScript compiles `await import(x)` to `require(x)` in CJS mode.
+// Constructing the call via Function bypasses the compiler so Node.js
+// executes a real native ESM dynamic import at runtime.
+// eslint-disable-next-line @typescript-eslint/no-implied-eval, @typescript-eslint/no-explicit-any
+const _esmImport = new Function('s', 'return import(s)') as (s: string) => Promise<any>;
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _baileys: any = null;
 async function baileys() {
-  if (!_baileys) _baileys = await import('baileys');
+  if (!_baileys) _baileys = await _esmImport('baileys');
   return _baileys;
 }
 
@@ -152,13 +157,27 @@ export async function initializeExistingSessions(): Promise<void> {
 // ─── Send (fire-and-forget) ───────────────────────────────────────────────────
 
 export function sendWA(restaurantId: string, phone: string | undefined | null, message: string): void {
-  if (!phone) return;
+  if (!phone) {
+    logger.warn(`[WhatsApp] Skipping send for restaurant ${restaurantId} — no phone number`);
+    return;
+  }
   const session = sessions.get(restaurantId);
-  if (!session || session.status !== 'connected' || !session.socket) return;
+  if (!session) {
+    logger.warn(`[WhatsApp] Skipping send to ${phone} — no session for restaurant ${restaurantId} (not connected)`);
+    return;
+  }
+  if (session.status !== 'connected' || !session.socket) {
+    logger.warn(`[WhatsApp] Skipping send to ${phone} — session status is "${session.status}" (error: ${session.error ?? 'none'})`);
+    return;
+  }
 
   const jid = toJid(phone);
-  if (!jid) return;
+  if (!jid) {
+    logger.warn(`[WhatsApp] Skipping send — could not build JID from phone "${phone}"`);
+    return;
+  }
 
+  logger.info(`[WhatsApp] Sending message to ${phone} (${jid})`);
   session.socket.sendMessage(jid, { text: message }).catch((err: unknown) =>
     logger.error(`[WhatsApp] Send failed (${phone}): ${String(err)}`),
   );

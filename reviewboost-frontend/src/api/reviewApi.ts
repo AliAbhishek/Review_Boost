@@ -16,12 +16,12 @@ export const reviewApi = {
 
   logReview: (data: ReviewLogPayload & { token?: string }) =>
     publicClient
-      .post<{ status: string; data: { reviewLog: ReviewLog; voucher: Voucher | null } }>('/api/review/log', data)
+      .post<{ status: string; data: { reviewLog: ReviewLog; voucher: Voucher | null; redemptionCode: string | null } }>('/api/review/log', data)
       .then((r) => r.data.data),
 
   submitPrivateFeedback: (data: { slug: string; stars: number; feedback: string; token?: string }) =>
     publicClient
-      .post<{ status: string; data: { reviewLog: ReviewLog; voucher: Voucher | null } }>('/api/review/log', {
+      .post<{ status: string; data: { reviewLog: ReviewLog; voucher: Voucher | null; redemptionCode: string | null } }>('/api/review/log', {
         slug:       data.slug,
         stars:      data.stars,
         reviewText: data.feedback,

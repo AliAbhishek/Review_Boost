@@ -33,7 +33,7 @@ async function processFollowUpEmails() {
       });
 
       const reviewUrl = `${env.FRONTEND_URL}/r/${restaurant.slug}?token=${token}`;
-      sendReviewRequestEmail(customer.name, customer.email, restaurant.name, restaurant.slug, token);
+      sendReviewRequestEmail(customer.name, customer.email, restaurant.name, restaurant.slug, token, restaurant.logoUrl, restaurant.logoColor);
       sendWA(
         restaurant._id.toString(),
         customer.phone,

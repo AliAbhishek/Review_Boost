@@ -52,6 +52,30 @@ export const ownerApi = {
       .put<Wrapped<Restaurant>>('/api/owner/profile', data)
       .then((r) => r.data.data),
 
+  uploadLogo: (file: File) => {
+    const form = new FormData()
+    form.append('logo', file)
+    return client
+      .post<Wrapped<{ logoUrl: string }>>('/api/owner/logo', form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+      .then((r) => r.data.data.logoUrl)
+  },
+
+  deleteLogo: () => client.delete('/api/owner/logo'),
+
+  getReviewQR: () =>
+    client
+      .get<{ status: string; data: { qrDataUrl: string; reviewUrl: string; restaurantName: string } }>('/api/owner/qr')
+      .then((r) => r.data.data),
+
+  setBillingPin: (pin: string) =>
+    client
+      .post<{ status: string; data: { message: string } }>('/api/owner/billing-pin', { pin })
+      .then((r) => r.data.data),
+
+  removeBillingPin: () => client.delete('/api/owner/billing-pin'),
+
   // ─── Customers ───────────────────────────────────────────────────────────────
   getCustomers: (page = 1) =>
     client

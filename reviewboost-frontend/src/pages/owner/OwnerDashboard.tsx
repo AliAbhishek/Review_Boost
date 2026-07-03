@@ -187,6 +187,15 @@ export default function OwnerDashboard() {
     enabled: activeTab === 'billing',
   })
 
+  const logoUploadMutation = useMutation({
+    mutationFn: ownerApi.uploadLogo,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['owner-profile'] }),
+  })
+  const logoDeleteMutation = useMutation({
+    mutationFn: ownerApi.deleteLogo,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['owner-profile'] }),
+  })
+
   const updateMutation = useMutation({
     mutationFn: ownerApi.updateProfile,
     onSuccess: () => {
@@ -238,6 +247,64 @@ export default function OwnerDashboard() {
     queryFn: () => ownerApi.getCustomer(selectedCustomerId!),
     enabled: !!selectedCustomerId,
   })
+
+  const [pinInput, setPinInput] = useState('')
+  const [pinSaved, setPinSaved] = useState(false)
+  const [qrDownloading, setQrDownloading] = useState(false)
+
+  const { data: reviewQR } = useQuery({
+    queryKey: ['review-qr'],
+    queryFn: ownerApi.getReviewQR,
+    enabled: activeTab === 'profile',
+    staleTime: Infinity,
+  })
+
+  const setBillingPinMutation = useMutation({
+    mutationFn: (pin: string) => ownerApi.setBillingPin(pin),
+    onSuccess: () => { setPinInput(''); setPinSaved(true); setTimeout(() => setPinSaved(false), 2500) },
+  })
+  const removeBillingPinMutation = useMutation({
+    mutationFn: ownerApi.removeBillingPin,
+    onSuccess: () => { setPinInput('') },
+  })
+
+  const downloadQR = () => {
+    if (!reviewQR?.qrDataUrl) return
+    setQrDownloading(true)
+    const link = document.createElement('a')
+    link.href = reviewQR.qrDataUrl
+    link.download = `${profile?.slug ?? 'review'}-qr.png`
+    link.click()
+    setTimeout(() => setQrDownloading(false), 1000)
+  }
+
+  const printQR = () => {
+    if (!reviewQR) return
+    const w = window.open('', '_blank', 'width=480,height=640')
+    if (!w) return
+    w.document.write(`<!DOCTYPE html>
+<html>
+<head><title>Review QR — ${reviewQR.restaurantName}</title>
+<style>body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:32px;}
+.logo{width:64px;height:64px;border-radius:18px;object-fit:cover;margin-bottom:16px;}
+.avatar{width:64px;height:64px;border-radius:18px;background:${profile?.logoColor ?? '#6366f1'};display:flex;align-items:center;justify-content:center;color:#fff;font-size:28px;font-weight:900;margin-bottom:16px;}
+h1{margin:0 0 6px;font-size:24px;font-weight:900;color:#111827;text-align:center;}
+p{margin:0 0 24px;font-size:14px;color:#6b7280;text-align:center;}
+img.qr{width:240px;height:240px;border-radius:12px;border:1px solid #e5e7eb;}
+.cta{margin-top:20px;font-size:17px;font-weight:800;color:#111827;text-align:center;}
+.sub{font-size:13px;color:#9ca3af;margin-top:4px;text-align:center;}
+@media print{body{padding:0;}}</style></head>
+<body>
+${profile?.logoUrl ? `<img class="logo" src="${profile.logoUrl}" alt="${reviewQR.restaurantName}" />` : `<div class="avatar">${reviewQR.restaurantName[0]}</div>`}
+<h1>${reviewQR.restaurantName}</h1>
+<p>Scan to share your feedback</p>
+<img class="qr" src="${reviewQR.qrDataUrl}" alt="QR Code" />
+<div class="cta">⭐⭐⭐⭐⭐</div>
+<div class="sub">Takes 30 seconds · We'd love to hear from you!</div>
+<script>window.onload=()=>{window.print();window.close()}<\/script>
+</body></html>`)
+    w.document.close()
+  }
 
   const { data: waStatus, refetch: refetchWA } = useQuery({
     queryKey: ['wa-status'],
@@ -859,7 +926,7 @@ export default function OwnerDashboard() {
                     {menuItems.length === 0 ? (
                       <p className="text-center text-gray-400 text-sm py-4">Add items in the Menu tab first</p>
                     ) : (
-                      <div className="grid grid-cols-2 gap-2 max-h-72 overflow-y-auto">
+                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-2 gap-2 max-h-72 overflow-y-auto">
                         {menuItems
                           .filter((i) => i.isAvailable && (!posSearch || i.name.toLowerCase().includes(posSearch.toLowerCase())))
                           .map((item) => (
@@ -905,10 +972,10 @@ export default function OwnerDashboard() {
                             </div>
                             <div className="flex items-center gap-1">
                               <button onClick={() => updateQty(item.menuItemId, item.quantity - 1)}
-                                className="w-5 h-5 rounded border border-gray-200 text-gray-500 hover:bg-gray-50 text-xs font-bold flex items-center justify-center">−</button>
-                              <span className="w-5 text-center text-sm font-semibold text-gray-900">{item.quantity}</span>
+                                className="w-7 h-7 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 text-sm font-bold flex items-center justify-center active:scale-95">−</button>
+                              <span className="w-6 text-center text-sm font-semibold text-gray-900">{item.quantity}</span>
                               <button onClick={() => updateQty(item.menuItemId, item.quantity + 1)}
-                                className="w-5 h-5 rounded border border-gray-200 text-gray-500 hover:bg-gray-50 text-xs font-bold flex items-center justify-center">+</button>
+                                className="w-7 h-7 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 text-sm font-bold flex items-center justify-center active:scale-95">+</button>
                             </div>
                             <div className="flex items-center gap-0.5">
                               <span className="text-xs text-gray-400">₹</span>
@@ -961,10 +1028,14 @@ export default function OwnerDashboard() {
                       <button
                         onClick={handleGenerateBill}
                         disabled={!billCustomer.name.trim() || cart.length === 0 || createBillMutation.isPending}
-                        className="mt-4 w-full py-3.5 bg-indigo-600 text-white text-sm font-bold rounded-xl hover:bg-indigo-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                        className="mt-4 w-full py-4 bg-indigo-600 text-white text-sm font-bold rounded-xl hover:bg-indigo-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 lg:py-3.5"
                       >
                         <Receipt className="w-4 h-4" />
-                        {createBillMutation.isPending ? 'Generating…' : 'Generate Bill'}
+                        {createBillMutation.isPending ? 'Generating…' : `Generate Bill${cart.length > 0 ? ` — ₹${(() => {
+                          const pre = cartSubtotal + (profile?.taxConfig?.gstEnabled ? (profile.taxConfig.useIgst ? cartSubtotal * profile.taxConfig.igst / 100 : cartSubtotal * (profile.taxConfig.cgst + profile.taxConfig.sgst) / 100) : 0) + (profile?.taxConfig?.serviceChargeEnabled ? cartSubtotal * profile.taxConfig.serviceCharge / 100 : 0)
+                          const disc = voucherValidation ? pre * voucherValidation.discountPercent / 100 : 0
+                          return (pre - disc).toFixed(0)
+                        })()}` : ''}`}
                       </button>
                       {!billCustomer.name.trim() && <p className="text-xs text-amber-500 text-center mt-1.5">Enter customer name to proceed</p>}
                     </div>
@@ -1483,6 +1554,63 @@ export default function OwnerDashboard() {
                   </div>
                 </div>
 
+                {/* Logo upload — outside form submit, handled separately */}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1.5">Business Logo</label>
+                  {profile?.logoUrl ? (
+                    <div className="flex items-center gap-3">
+                      <img src={profile.logoUrl} alt="Logo" className="w-16 h-16 rounded-xl object-cover border border-gray-100" />
+                      <div className="flex-1">
+                        <p className="text-xs text-gray-500 mb-2">Logo uploaded — shown on review page & emails.</p>
+                        <div className="flex gap-2">
+                          <label className="cursor-pointer text-xs font-semibold text-indigo-600 hover:text-indigo-700 border border-indigo-200 hover:bg-indigo-50 px-3 py-1.5 rounded-lg transition-colors">
+                            Replace
+                            <input type="file" accept="image/*" className="hidden" onChange={(e) => {
+                              const f = e.target.files?.[0]
+                              if (f) logoUploadMutation.mutate(f)
+                            }} />
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => logoDeleteMutation.mutate()}
+                            disabled={logoDeleteMutation.isPending}
+                            className="text-xs font-semibold text-red-400 hover:text-red-500 border border-red-100 hover:bg-red-50 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <label className={cn(
+                      'flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded-xl p-6 cursor-pointer transition-colors',
+                      logoUploadMutation.isPending ? 'border-indigo-300 bg-indigo-50' : 'border-gray-200 hover:border-indigo-300 hover:bg-indigo-50/50',
+                    )}>
+                      {logoUploadMutation.isPending ? (
+                        <>
+                          <div className="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+                          <span className="text-xs text-indigo-500 font-medium">Uploading…</span>
+                        </>
+                      ) : (
+                        <>
+                          <div className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center text-gray-400 text-xl font-bold">+</div>
+                          <div className="text-center">
+                            <p className="text-xs font-semibold text-gray-600">Click to upload logo</p>
+                            <p className="text-xs text-gray-400 mt-0.5">PNG, JPG, WebP · max 5 MB</p>
+                          </div>
+                        </>
+                      )}
+                      <input type="file" accept="image/*" className="hidden" onChange={(e) => {
+                        const f = e.target.files?.[0]
+                        if (f) logoUploadMutation.mutate(f)
+                      }} />
+                    </label>
+                  )}
+                  {logoUploadMutation.isError && (
+                    <p className="text-red-400 text-xs mt-1.5">Upload failed — check file type and size.</p>
+                  )}
+                </div>
+
                 <motion.button
                   whileTap={{ scale: 0.97 }}
                   type="submit"
@@ -1577,6 +1705,82 @@ export default function OwnerDashboard() {
                   ))}
                 </div>
               )}
+            </div>
+
+            {/* Review QR Code */}
+            <div className="bg-white rounded-2xl border border-gray-100 p-6">
+              <div className="flex items-center gap-3 mb-5">
+                <div className="w-9 h-9 rounded-xl bg-indigo-50 flex items-center justify-center">
+                  <QrCode className="w-4 h-4 text-indigo-600" />
+                </div>
+                <div>
+                  <h2 className="font-semibold text-gray-900">Review QR Code</h2>
+                  <p className="text-xs text-gray-400 mt-0.5">Print and place on tables — customers scan to rate instantly</p>
+                </div>
+              </div>
+              {reviewQR ? (
+                <div className="flex flex-col items-center gap-4">
+                  <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100">
+                    <img src={reviewQR.qrDataUrl} alt="Review QR" className="w-48 h-48 rounded-xl" />
+                  </div>
+                  <p className="text-xs text-gray-400 text-center break-all font-mono">{reviewQR.reviewUrl}</p>
+                  <div className="flex gap-2 w-full">
+                    <button onClick={downloadQR} disabled={qrDownloading}
+                      className="flex-1 py-2.5 border border-gray-200 text-gray-700 text-xs font-semibold rounded-xl hover:bg-gray-50 transition-colors disabled:opacity-50">
+                      {qrDownloading ? 'Downloading…' : '⬇ Download PNG'}
+                    </button>
+                    <button onClick={printQR}
+                      className="flex-1 py-2.5 bg-indigo-600 text-white text-xs font-semibold rounded-xl hover:bg-indigo-700 transition-colors">
+                      🖨 Print Card
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-400 text-center">The print version includes your logo, business name, and a star graphic — ready to laminate and place on the table.</p>
+                </div>
+              ) : (
+                <div className="py-8 text-center text-gray-400 text-sm">Loading QR…</div>
+              )}
+            </div>
+
+            {/* Staff Billing PIN */}
+            <div className="bg-white rounded-2xl border border-gray-100 p-6">
+              <div className="flex items-center gap-3 mb-5">
+                <div className="w-9 h-9 rounded-xl bg-amber-50 flex items-center justify-center">
+                  <span className="text-amber-600 text-base">🔐</span>
+                </div>
+                <div>
+                  <h2 className="font-semibold text-gray-900">Staff Billing PIN</h2>
+                  <p className="text-xs text-gray-400 mt-0.5">Set a PIN so cashiers can create bills without full dashboard access</p>
+                </div>
+              </div>
+              <p className="text-xs text-gray-500 mb-4">
+                Staff visit <span className="font-mono font-medium text-indigo-600">{window.location.origin}/staff</span> and enter your restaurant slug + this PIN. They get a billing-only view — no customers, analytics, or settings.
+              </p>
+              <div className="space-y-3">
+                <div className="flex gap-2">
+                  <input
+                    type="password"
+                    value={pinInput}
+                    onChange={(e) => setPinInput(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    placeholder="6-digit PIN"
+                    maxLength={6}
+                    className="flex-1 px-3.5 py-2.5 text-sm border border-gray-200 rounded-xl font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500/30 transition-all"
+                  />
+                  <button
+                    onClick={() => { if (/^\d{6}$/.test(pinInput)) setBillingPinMutation.mutate(pinInput) }}
+                    disabled={!/^\d{6}$/.test(pinInput) || setBillingPinMutation.isPending}
+                    className="px-4 py-2.5 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-700 transition-colors disabled:opacity-50"
+                  >
+                    {pinSaved ? '✓ Saved' : setBillingPinMutation.isPending ? '…' : 'Set PIN'}
+                  </button>
+                </div>
+                <button
+                  onClick={() => { if (confirm('Remove the billing PIN? Staff will no longer be able to log in.')) removeBillingPinMutation.mutate() }}
+                  disabled={removeBillingPinMutation.isPending}
+                  className="text-xs text-red-400 hover:text-red-500 transition-colors disabled:opacity-50"
+                >
+                  Remove PIN (disable staff access)
+                </button>
+              </div>
             </div>
 
             {/* Tax Config */}

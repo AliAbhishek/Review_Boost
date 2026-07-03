@@ -311,6 +311,7 @@ export function SalesTab() {
 
   const summary   = data?.summary
   const vouchers  = data?.vouchers
+  const reviews   = data?.reviews
   const timeline  = data?.timeline ?? []
   const leaderboard = data?.leaderboard ?? []
 
@@ -423,6 +424,42 @@ export function SalesTab() {
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* Review conversion funnel */}
+          {reviews && reviews.emailsSent > 0 && (
+            <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <span className="text-base">⭐</span>
+                <h3 className="font-semibold text-indigo-900 text-sm">Review Funnel</h3>
+                <span className={cn(
+                  'ml-auto text-xs font-bold px-2.5 py-1 rounded-full',
+                  reviews.conversionRate >= 50 ? 'bg-green-100 text-green-700'
+                  : reviews.conversionRate >= 25 ? 'bg-amber-100 text-amber-700'
+                  : 'bg-red-100 text-red-600',
+                )}>
+                  {reviews.conversionRate}% conversion
+                </span>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                {[
+                  { label: 'Emails Sent',  value: reviews.emailsSent, emoji: '📧' },
+                  { label: 'Reviews Got',  value: reviews.count,      emoji: '⭐' },
+                  { label: 'Conv. Rate',   value: `${reviews.conversionRate}%`, emoji: '📈' },
+                ].map(({ label, value, emoji }) => (
+                  <div key={label} className="bg-white rounded-xl p-3 text-center border border-indigo-100">
+                    <p className="text-base mb-0.5">{emoji}</p>
+                    <p className="text-xl font-black text-indigo-700">{value}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">{label}</p>
+                  </div>
+                ))}
+              </div>
+              {reviews.conversionRate < 30 && (
+                <p className="text-xs text-indigo-500 mt-3 text-center">
+                  💡 Tip: A voucher reward boosts conversions to 50%+
+                </p>
+              )}
             </div>
           )}
 

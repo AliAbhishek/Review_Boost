@@ -10,7 +10,7 @@ import { VoucherRedemption } from '../models/VoucherRedemption';
 import { AppError } from '../utils/AppError';
 import { asyncHandler } from '../utils/asyncHandler';
 import { generateReviews } from '../services/aiService';
-import { sendPrivateReviewAlert, sendVoucherEmail } from '../services/emailService';
+import { sendPrivateReviewAlert, sendPositiveReviewAlert, sendVoucherEmail } from '../services/emailService';
 import { sendWA } from '../services/whatsappService';
 import { voucherWA } from '../services/whatsappMessages';
 import { logger } from '../utils/logger';
@@ -106,6 +106,8 @@ export const logReview = asyncHandler(async (req: Request, res: Response) => {
 
   if (submittedTo === 'private') {
     sendPrivateReviewAlert(restaurant.ownerEmail, stars, reviewText);
+  } else {
+    sendPositiveReviewAlert(restaurant.ownerEmail, restaurant.name, stars, reviewText);
   }
 
   // Issue a personalized voucher redemption if restaurant has an active voucher
@@ -142,6 +144,7 @@ export const logReview = asyncHandler(async (req: Request, res: Response) => {
         voucher.discountText,
         voucher.description,
         expiresAt,
+        restaurant.logoUrl,
       );
 
       sendWA(

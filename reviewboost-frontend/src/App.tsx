@@ -9,6 +9,7 @@ import LandingPage from '@/pages/LandingPage'
 import NotFound from '@/pages/NotFound'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import AdminProtectedRoute from '@/components/AdminProtectedRoute'
+import StaffPage from '@/pages/staff/StaffPage'
 
 export default function App() {
   return (
@@ -39,6 +40,9 @@ export default function App() {
           </ProtectedRoute>
         }
       />
+
+      {/* ── Staff billing ── */}
+      <Route path="/staff" element={<StaffPage />} />
 
       {/* ── Fallbacks ── */}
       <Route path="/" element={<LandingPage />} />

@@ -35,6 +35,7 @@ export interface Restaurant {
   googleReviewUrl?: string
   zomatoUrl?: string
   logoColor: string
+  logoUrl?: string
   taxConfig?: TaxConfig
   plan: 'trial' | 'basic' | 'pro'
   isActive: boolean

@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { requireAuth } from '../middleware/auth';
+import { requireAuth, requireBillingAuth } from '../middleware/auth';
 import { validate } from '../middleware/validate';
 import {
   listMenuItems,
@@ -17,9 +17,10 @@ import {
 } from '../controllers/menuController';
 
 const router = Router();
-router.use(requireAuth);
 
-router.get('/',               listMenuItems);
+// Staff can read the menu to build bills; all mutations are owner-only
+router.get('/',               requireBillingAuth, listMenuItems);
+router.use(requireAuth);
 router.post('/',              validate(menuItemSchema),       addMenuItem);
 router.post('/bulk',          validate(bulkMenuSchema),       bulkAddMenuItems);
 router.post('/bulk-offer',    validate(bulkOfferSchema),      bulkApplyOffer);

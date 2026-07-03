@@ -5,7 +5,7 @@ import { Owner } from '../models/Owner';
 import { Restaurant } from '../models/Restaurant';
 import { AppError } from '../utils/AppError';
 import { asyncHandler } from '../utils/asyncHandler';
-import { signOwnerToken } from '../middleware/auth';
+import { signOwnerToken, signStaffToken } from '../middleware/auth';
 import { sendWelcomeEmail } from '../services/emailService';
 
 export const registerSchema = z.object({
@@ -55,6 +55,35 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
   const token = signOwnerToken(owner._id, owner.restaurantId);
 
   res.success({ token, owner: { id: owner._id, name: owner.name, email: owner.email } });
+});
+
+export const staffLoginSchema = z.object({
+  slug: z.string().min(1),
+  pin:  z.string().regex(/^\d{6}$/, 'PIN must be exactly 6 digits'),
+});
+
+export const staffLogin = asyncHandler(async (req: Request, res: Response) => {
+  const { slug, pin } = req.body as z.infer<typeof staffLoginSchema>;
+
+  const restaurant = await Restaurant.findOne({ slug, isActive: true }).select('+billingPin');
+  if (!restaurant) throw new AppError('Restaurant not found', 404);
+  if (!restaurant.billingPin) throw new AppError('Staff billing access not configured for this restaurant', 400);
+
+  const valid = await bcrypt.compare(pin, restaurant.billingPin);
+  if (!valid) throw new AppError('Incorrect PIN', 401);
+
+  const token = signStaffToken(restaurant._id.toString());
+
+  res.success({
+    token,
+    restaurant: {
+      id: restaurant._id,
+      name: restaurant.name,
+      slug: restaurant.slug,
+      logoUrl: restaurant.logoUrl,
+      logoColor: restaurant.logoColor,
+    },
+  });
 });
 
 export const getMe = asyncHandler(async (req: Request, res: Response) => {

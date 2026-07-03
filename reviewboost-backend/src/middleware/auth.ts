@@ -10,6 +10,11 @@ export interface OwnerJwtPayload {
   restaurantId: string;
 }
 
+export interface StaffJwtPayload {
+  restaurantId: string;
+  role: 'staff';
+}
+
 export interface AdminJwtPayload {
   id: string;
   email: string;
@@ -47,6 +52,30 @@ export function requireAuth(req: Request, _res: Response, next: NextFunction): v
 }
 
 /**
+ * Accepts both owner and staff JWTs — used on billing routes.
+ * Sets req.owner so existing controllers work without changes.
+ */
+export function requireBillingAuth(req: Request, _res: Response, next: NextFunction): void {
+  const token = extractBearerToken(req);
+  if (!token) {
+    next(new AppError('Authentication required', 401));
+    return;
+  }
+
+  try {
+    const payload = jwt.verify(token, env.JWT_SECRET) as OwnerJwtPayload | StaffJwtPayload;
+    if (payload.role !== 'owner' && payload.role !== 'staff') {
+      next(new AppError('Invalid token role', 403));
+      return;
+    }
+    req.owner = { id: (payload as OwnerJwtPayload).id ?? '', role: payload.role as 'owner', restaurantId: payload.restaurantId };
+    next();
+  } catch {
+    next(new AppError('Invalid or expired token', 401));
+  }
+}
+
+/**
  * Validates an admin JWT (signed with ADMIN_SECRET) and attaches payload to req.admin.
  * Returns 401/403 if the token is missing, invalid, or not an admin token.
  */
@@ -76,6 +105,15 @@ export function signOwnerToken(ownerId: Types.ObjectId, restaurantId: Types.Obje
     { id: ownerId.toString(), role: 'owner', restaurantId: restaurantId.toString() },
     env.JWT_SECRET,
     { expiresIn: env.JWT_EXPIRES_IN } as jwt.SignOptions,
+  );
+}
+
+/** Signs a short-lived JWT for staff / cashier access (billing only). */
+export function signStaffToken(restaurantId: string): string {
+  return jwt.sign(
+    { restaurantId, role: 'staff' },
+    env.JWT_SECRET,
+    { expiresIn: '12h' },
   );
 }
 

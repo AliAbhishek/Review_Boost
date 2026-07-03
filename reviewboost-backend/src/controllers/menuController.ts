@@ -89,7 +89,7 @@ async function broadcastOffers(
 
   for (const customer of customers) {
     if (!customer.email) continue;
-    sendOfferEmail(customer.name, customer.email, restaurant.name, restaurant.logoColor ?? '#6366f1', offers);
+    sendOfferEmail(customer.name, customer.email, restaurant.name, restaurant.logoColor ?? '#6366f1', offers, restaurant.logoUrl);
     sendWA(restaurantId as string, customer.phone, offerWA(customer.name, restaurant.name, offers));
   }
   logger.info(`[Offer] Queued ${customers.length} offer notification(s)`);

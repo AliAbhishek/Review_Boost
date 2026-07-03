@@ -147,7 +147,7 @@ export const sendReviewForBill = asyncHandler(async (req: Request, res: Response
   ]);
 
   const reviewUrl = `${env.FRONTEND_URL}/r/${restaurant.slug}?token=${token}`;
-  sendReviewRequestEmail(customer.name, customer.email, restaurant.name, restaurant.slug, token);
+  sendReviewRequestEmail(customer.name, customer.email, restaurant.name, restaurant.slug, token, restaurant.logoUrl, restaurant.logoColor);
   sendWA(restaurantId.toString(), customer.phone, reviewRequestWA(customer.name, restaurant.name, reviewUrl));
   logger.info(`[Manual] Review email+WA queued for ${customer.email} (bill ${billId ?? 'latest'})`);
 

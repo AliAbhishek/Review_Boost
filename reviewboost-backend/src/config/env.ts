@@ -32,6 +32,10 @@ const envSchema = z.object({
   SMTP_FROM: z.string().default('ReviewBoost <noreply@reviewboost.in>'),
   // Frontend base URL — used for invite links in emails
   FRONTEND_URL: z.string().default('http://localhost:5173'),
+  // Cloudinary — logo uploads
+  CLOUDINARY_CLOUD_NAME: z.string().default(''),
+  CLOUDINARY_API_KEY:    z.string().default(''),
+  CLOUDINARY_API_SECRET: z.string().default(''),
 });
 
 const result = envSchema.safeParse(process.env);
