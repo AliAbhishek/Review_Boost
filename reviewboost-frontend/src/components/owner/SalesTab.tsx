@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
-import { TrendingUp, TrendingDown, ShoppingBag, Receipt, Package, Tag, X, CheckSquare, Square } from 'lucide-react'
+import { TrendingUp, TrendingDown, ShoppingBag, Receipt, Package, Tag, X, CheckSquare, Square, Users } from 'lucide-react'
 import { billApi, type AnalyticsPeriod, type TimelinePoint, type LeaderboardItem } from '@/api/billApi'
 import { menuApi } from '@/api/menuApi'
 import { cn } from '@/utils/cn'
@@ -288,6 +288,76 @@ const PERIODS: { value: AnalyticsPeriod; label: string }[] = [
 ]
 
 // ─── Main component ───────────────────────────────────────────────────────────
+// ─── Staff Performance ────────────────────────────────────────────────────────
+
+function StaffPerformance({ period }: { period: AnalyticsPeriod }) {
+  const p = period === 'custom' ? 'week' : period
+  const { data, isLoading } = useQuery({
+    queryKey: ['staff-stats', p],
+    queryFn: () => billApi.staffStats(p as 'day' | 'week' | 'month'),
+  })
+
+  if (isLoading) return null
+  if (!data || data.staff.length === 0) return (
+    <div className="bg-white border border-gray-100 rounded-2xl p-5">
+      <div className="flex items-center gap-2 mb-2">
+        <Users className="w-4 h-4 text-gray-400" />
+        <h3 className="font-semibold text-gray-900 text-sm">Staff Performance</h3>
+      </div>
+      <p className="text-xs text-gray-400 text-center py-6">No staff orders yet. Bills placed by named staff members will appear here.</p>
+    </div>
+  )
+
+  const top = data.staff[0]
+
+  return (
+    <div className="bg-white border border-gray-100 rounded-2xl p-5">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <Users className="w-4 h-4 text-indigo-500" />
+          <h3 className="font-semibold text-gray-900 text-sm">Staff Performance</h3>
+        </div>
+        <span className="text-xs text-gray-400">{data.staff.length} staff · {data.totalBills} total bills</span>
+      </div>
+
+      <div className="space-y-3">
+        {data.staff.map((s, i) => (
+          <div key={s.name}>
+            <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center gap-2">
+                <div className={cn(
+                  'w-6 h-6 rounded-full flex items-center justify-center text-xs font-black',
+                  i === 0 ? 'bg-amber-400 text-white' : i === 1 ? 'bg-gray-300 text-gray-700' : 'bg-orange-300 text-white',
+                )}>
+                  {i + 1}
+                </div>
+                <span className="text-sm font-semibold text-gray-900">{s.name}</span>
+                {s.name === top.name && data.staff.length > 1 && (
+                  <span className="text-xs bg-amber-50 text-amber-600 font-semibold px-1.5 py-0.5 rounded-full">Top</span>
+                )}
+              </div>
+              <div className="text-right">
+                <span className="text-sm font-bold text-gray-900">{fmt(s.revenue)}</span>
+                <span className="text-xs text-gray-400 ml-2">{s.bills} bill{s.bills !== 1 ? 's' : ''}</span>
+              </div>
+            </div>
+            <div className="w-full bg-gray-100 rounded-full h-1.5">
+              <div
+                className="bg-indigo-500 rounded-full h-1.5 transition-all"
+                style={{ width: `${s.share}%` }}
+              />
+            </div>
+            <div className="flex justify-between mt-0.5">
+              <span className="text-xs text-gray-400">{s.share}% of all bills</span>
+              <span className="text-xs text-gray-400">avg ₹{s.avgBill.toFixed(0)}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export function SalesTab() {
   const queryClient = useQueryClient()
 
@@ -549,6 +619,9 @@ export function SalesTab() {
               />
             )}
           </AnimatePresence>
+
+          {/* Staff Performance */}
+          <StaffPerformance period={period} />
 
           {/* Bottom insight strip */}
           {soldItems.length > 0 && (

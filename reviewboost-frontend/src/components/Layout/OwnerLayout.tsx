@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { LogOut, Zap, BarChart2, Star, Users, Gift, Settings, UtensilsCrossed, Receipt, TrendingUp } from 'lucide-react'
+import { LogOut, Zap, BarChart2, Star, Users, Gift, Settings, UtensilsCrossed, Receipt, TrendingUp, ChefHat } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { cn } from '@/utils/cn'
 import { useAuthStore } from '@/store/authStore'
@@ -82,15 +82,30 @@ export default function OwnerLayout({ children, activeTab, onTabChange }: OwnerL
           })}
         </nav>
 
+        {/* Quick links */}
+        <div className="mx-2.5 mb-2 space-y-1">
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-3 mb-1">Quick Links</p>
+          <a href="/staff" target="_blank" rel="noopener noreferrer"
+            className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-50 transition-all">
+            <Receipt className="w-4 h-4 text-gray-400" />
+            Staff Billing
+          </a>
+          <a href="/kitchen" target="_blank" rel="noopener noreferrer"
+            className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-50 transition-all">
+            <ChefHat className="w-4 h-4 text-gray-400" />
+            Kitchen Display
+          </a>
+        </div>
+
         {/* Upgrade card */}
-        <div className="mx-2.5 mb-2.5 rounded-2xl p-4"
+        {/* <div className="mx-2.5 mb-2.5 rounded-2xl p-4"
           style={{ background: 'linear-gradient(135deg, #eef2ff, #f5f3ff)', border: '1px solid #e0e7ff' }}>
           <p className="text-xs font-black text-indigo-900 mb-0.5">Upgrade to Pro</p>
           <p className="text-[11px] text-indigo-400 mb-2.5">Unlimited reviews & analytics</p>
           <button className="w-full py-1.5 rounded-lg text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 transition-colors">
             View Plans →
           </button>
-        </div>
+        </div> */}
 
         {/* Logout */}
         <div className="p-2.5 border-t border-gray-100 flex-shrink-0">

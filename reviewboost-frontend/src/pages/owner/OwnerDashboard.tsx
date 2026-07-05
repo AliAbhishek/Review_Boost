@@ -88,6 +88,86 @@ const submittedToColors: Record<ReviewLog['submittedTo'], string> = {
   private: 'bg-gray-100 text-gray-500',
 }
 
+function TableQrSection({ slug }: { slug: string }) {
+  const [tableNum, setTableNum] = useState('1')
+  const origin = window.location.origin
+  const url = slug ? `${origin}/table/${slug}/${tableNum}` : ''
+
+  function printTableQR() {
+    const w = window.open('', '_blank')!
+    w.document.write(`<!DOCTYPE html><html><head><title>Table ${tableNum} Order QR</title>
+<style>body{font-family:sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#f9fafb;}
+.card{background:#fff;border-radius:20px;padding:32px;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,0.08);max-width:320px;}
+h2{font-size:22px;font-weight:900;margin:0 0 4px;} p{color:#6b7280;font-size:13px;margin:0 0 20px;}
+.table-badge{background:#6366f1;color:#fff;border-radius:20px;padding:6px 20px;font-size:18px;font-weight:900;display:inline-block;margin-bottom:20px;}
+img{width:200px;height:200px;border-radius:12px;}</style></head>
+<body onload="window.print()"><div class="card">
+<span class="table-badge">Table ${tableNum}</span>
+<h2>Order Here</h2><p>Scan to browse menu and order</p>
+<img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(url)}" />
+<p style="margin-top:12px;font-size:11px;color:#9ca3af;">${url}</p>
+</div></body></html>`)
+    w.document.close()
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex gap-2 items-center">
+        <span className="text-sm text-gray-600 font-medium">Table #</span>
+        <input
+          value={tableNum}
+          onChange={(e) => setTableNum(e.target.value.replace(/\D/g, '') || '1')}
+          className="w-16 px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/30 text-center font-mono"
+        />
+        <button
+          onClick={printTableQR}
+          disabled={!slug}
+          className="flex-1 py-2 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-40"
+        >
+          🖨 Print Table QR
+        </button>
+      </div>
+      {url && <p className="text-xs text-gray-400 font-mono break-all">{url}</p>}
+      <p className="text-xs text-gray-400">Print one QR per table. Customers scan → browse menu → place order → kitchen gets it instantly.</p>
+    </div>
+  )
+}
+
+function UpiIdField() {
+  const qc = useQueryClient()
+  const { data: profile } = useQuery({ queryKey: ['owner-profile'], queryFn: ownerApi.getProfile })
+  const [value, setValue] = useState('')
+  const [saved, setSaved] = useState(false)
+
+  useEffect(() => { if (profile?.upiId !== undefined) setValue(profile.upiId ?? '') }, [profile])
+
+  const mutation = useMutation({
+    mutationFn: (upiId: string) => ownerApi.updateProfile({ upiId }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['owner-profile'] }); setSaved(true); setTimeout(() => setSaved(false), 2500) },
+  })
+
+  return (
+    <div className="space-y-3">
+      <div className="flex gap-2">
+        <input
+          value={value}
+          onChange={(e) => { setValue(e.target.value); setSaved(false) }}
+          placeholder="yourname@upi or 9876543210@paytm"
+          className="flex-1 px-3.5 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500/30 font-mono"
+        />
+        <button
+          onClick={() => mutation.mutate(value)}
+          disabled={mutation.isPending || !value.trim()}
+          className="px-4 py-2.5 bg-green-600 text-white text-sm font-semibold rounded-xl hover:bg-green-700 transition-colors disabled:opacity-50"
+        >
+          {saved ? '✓ Saved' : mutation.isPending ? '…' : 'Save'}
+        </button>
+      </div>
+      <p className="text-xs text-gray-400">When set, a UPI QR code is embedded in every receipt email so customers can scan and pay instantly.</p>
+    </div>
+  )
+}
+
 function StarDisplay({ count }: { count: number }) {
   return (
     <div className="flex gap-0.5">
@@ -1741,6 +1821,20 @@ ${profile?.logoUrl ? `<img class="logo" src="${profile.logoUrl}" alt="${reviewQR
               )}
             </div>
 
+            {/* Table Self-Order QR */}
+            <div className="bg-white rounded-2xl border border-gray-100 p-6">
+              <div className="flex items-center gap-3 mb-5">
+                <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center">
+                  <UtensilsCrossed className="w-4 h-4 text-blue-600" />
+                </div>
+                <div>
+                  <h2 className="font-semibold text-gray-900">Table Self-Order QR</h2>
+                  <p className="text-xs text-gray-400 mt-0.5">Customers scan at the table to order directly — no waiter needed</p>
+                </div>
+              </div>
+              <TableQrSection slug={profile?.slug ?? ''} />
+            </div>
+
             {/* Staff Billing PIN */}
             <div className="bg-white rounded-2xl border border-gray-100 p-6">
               <div className="flex items-center gap-3 mb-5">
@@ -1781,6 +1875,20 @@ ${profile?.logoUrl ? `<img class="logo" src="${profile.logoUrl}" alt="${reviewQR
                   Remove PIN (disable staff access)
                 </button>
               </div>
+            </div>
+
+            {/* UPI Payment ID */}
+            <div className="bg-white rounded-2xl border border-gray-100 p-6">
+              <div className="flex items-center gap-3 mb-5">
+                <div className="w-9 h-9 rounded-xl bg-green-50 flex items-center justify-center">
+                  <span className="text-green-600 text-base">📱</span>
+                </div>
+                <div>
+                  <h2 className="font-semibold text-gray-900">UPI Payment ID</h2>
+                  <p className="text-xs text-gray-400 mt-0.5">Customers can scan a QR in the receipt email to pay instantly</p>
+                </div>
+              </div>
+              <UpiIdField />
             </div>
 
             {/* Tax Config */}

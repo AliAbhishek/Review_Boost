@@ -42,6 +42,9 @@ export interface Restaurant {
   createdAt: string
   ownerEmail?: string
   ownerPhone?: string
+  upiId?: string
+  orderCount?: number
+  reviewStats?: { count: number; avgStars: number }
 }
 
 // Only 3 fields needed to create a business — everything else is filled in later
@@ -66,4 +69,5 @@ export interface UpdateRestaurantDto {
   taxConfig?: TaxConfig
   plan?: 'trial' | 'basic' | 'pro'
   isActive?: boolean
+  upiId?: string
 }

@@ -3,6 +3,9 @@ import { z } from 'zod';
 import { Types } from 'mongoose';
 import { Restaurant, BUSINESS_TYPES } from '../models/Restaurant';
 import { ReviewLog } from '../models/ReviewLog';
+import { Order } from '../models/Order';
+import { MenuItem } from '../models/MenuItem';
+import { Bill } from '../models/Bill';
 import { AppError } from '../utils/AppError';
 import { asyncHandler } from '../utils/asyncHandler';
 import { generateUniqueSlug } from '../utils/slugify';
@@ -31,6 +34,7 @@ export const updateRestaurantSchema = z.object({
   zomatoUrl:       z.string().url().optional().or(z.literal('')),
   logoColor:     z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
   ownerPhone:    z.string().min(7).max(20).optional(),
+  upiId:         z.string().max(100).optional().or(z.literal('')),
   plan:          z.enum(['trial', 'basic', 'pro']).optional(),
   trialEndsAt:   z.string().datetime().optional(),
   isActive:      z.boolean().optional(),
@@ -56,21 +60,31 @@ export const getAllRestaurants = asyncHandler(async (_req: Request, res: Respons
   const restaurants = await Restaurant.find().sort({ createdAt: -1 }).lean();
 
   const restaurantIds = restaurants.map((r) => r._id);
-  const reviewCounts = await ReviewLog.aggregate([
-    { $match: { restaurantId: { $in: restaurantIds } } },
-    { $group: { _id: '$restaurantId', count: { $sum: 1 }, avgStars: { $avg: '$stars' } } },
+  const [reviewCounts, orderCounts] = await Promise.all([
+    ReviewLog.aggregate([
+      { $match: { restaurantId: { $in: restaurantIds } } },
+      { $group: { _id: '$restaurantId', count: { $sum: 1 }, avgStars: { $avg: '$stars' } } },
+    ]),
+    Order.aggregate([
+      { $match: { restaurantId: { $in: restaurantIds } } },
+      { $group: { _id: '$restaurantId', count: { $sum: 1 } } },
+    ]),
   ]);
 
-  const countMap = new Map(
+  const reviewMap = new Map(
     reviewCounts.map((rc) => [
       rc._id.toString(),
       { count: rc.count as number, avgStars: rc.avgStars as number },
     ]),
   );
+  const orderMap = new Map(
+    orderCounts.map((oc) => [oc._id.toString(), oc.count as number]),
+  );
 
   const data = restaurants.map((r) => ({
     ...r,
-    reviewStats: countMap.get(r._id.toString()) ?? { count: 0, avgStars: 0 },
+    reviewStats: reviewMap.get(r._id.toString()) ?? { count: 0, avgStars: 0 },
+    orderCount: orderMap.get(r._id.toString()) ?? 0,
   }));
 
   res.success({ restaurants: data, total: data.length });
@@ -138,10 +152,79 @@ export const getQRCode = asyncHandler(async (req: Request, res: Response) => {
   res.send(buffer);
 });
 
+export const getRestaurantOverview = asyncHandler(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  if (!Types.ObjectId.isValid(id)) throw new AppError('Invalid ID', 400);
+
+  const rid = new Types.ObjectId(id);
+
+  const [restaurant, menuItems, recentOrders, recentBills, recentReviews, totalOrders, billAgg, reviewAgg, staffAgg] =
+    await Promise.all([
+      Restaurant.findById(id).lean(),
+      MenuItem.find({ restaurantId: rid }).sort({ category: 1, name: 1 }).lean(),
+      Order.find({ restaurantId: rid }).sort({ createdAt: -1 }).limit(20).lean(),
+      Bill.find({ restaurantId: rid }).sort({ createdAt: -1 }).limit(20).lean(),
+      ReviewLog.find({ restaurantId: rid }).sort({ timestamp: -1 }).limit(20).lean(),
+      Order.countDocuments({ restaurantId: rid }),
+      Bill.aggregate([
+        { $match: { restaurantId: rid } },
+        { $group: { _id: null, total: { $sum: '$grandTotal' }, count: { $sum: 1 } } },
+      ]),
+      ReviewLog.aggregate([
+        { $match: { restaurantId: rid } },
+        { $group: { _id: null, count: { $sum: 1 }, avg: { $avg: '$stars' } } },
+      ]),
+      Bill.aggregate([
+        { $match: { restaurantId: rid, staffName: { $exists: true, $ne: null } } },
+        { $group: { _id: '$staffName', bills: { $sum: 1 }, revenue: { $sum: '$grandTotal' } } },
+        { $sort: { revenue: -1 } },
+        { $limit: 10 },
+      ]),
+    ]);
+
+  if (!restaurant) throw new AppError('Restaurant not found', 404);
+
+  const billStat   = billAgg[0]   ?? { total: 0, count: 0 };
+  const reviewStat = reviewAgg[0] ?? { count: 0, avg: 0 };
+
+  res.success({
+    restaurant,
+    menuItems,
+    recentOrders,
+    recentBills,
+    recentReviews,
+    staffStats: staffAgg.map((s) => ({
+      name:    s._id    as string,
+      bills:   s.bills  as number,
+      revenue: s.revenue as number,
+    })),
+    stats: {
+      totalOrders,
+      totalBills:    billStat.count  as number,
+      totalRevenue:  billStat.total  as number,
+      totalReviews:  reviewStat.count as number,
+      avgRating:     Number(((reviewStat.avg as number) || 0).toFixed(1)),
+      menuItemCount: menuItems.length,
+    },
+  });
+});
+
+export const getRestaurantMenu = asyncHandler(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  if (!Types.ObjectId.isValid(id)) throw new AppError('Invalid ID', 400);
+
+  const items = await MenuItem.find({ restaurantId: id })
+    .sort({ category: 1, name: 1 })
+    .lean();
+
+  res.success({ items });
+});
+
 export const getStats = asyncHandler(async (_req: Request, res: Response) => {
-  const [totalRestaurants, totalReviews, planBreakdown] = await Promise.all([
+  const [totalRestaurants, totalReviews, totalOrders, planBreakdown] = await Promise.all([
     Restaurant.countDocuments({ isActive: true }),
     ReviewLog.countDocuments(),
+    Order.countDocuments(),
     Restaurant.aggregate([{ $group: { _id: '$plan', count: { $sum: 1 } } }]),
   ]);
 
@@ -150,5 +233,5 @@ export const getStats = asyncHandler(async (_req: Request, res: Response) => {
     if (p._id === 'basic' || p._id === 'pro') activePlans += p.count as number;
   }
 
-  res.success({ totalRestaurants, totalReviews, activePlans, revenue: 0 });
+  res.success({ totalRestaurants, totalReviews, totalOrders, activePlans, revenue: 0 });
 });

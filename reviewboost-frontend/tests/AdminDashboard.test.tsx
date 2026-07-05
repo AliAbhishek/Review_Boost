@@ -52,6 +52,7 @@ describe('AdminDashboard', () => {
     vi.spyOn(adminApiModule.adminApi, 'getStats').mockResolvedValue({
       totalRestaurants: 2,
       totalReviews: 100,
+      totalOrders: 50,
       activePlans: 1,
       revenue: 5000,
     })

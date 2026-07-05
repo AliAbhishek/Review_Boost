@@ -1,12 +1,13 @@
 import { Router } from 'express';
 import { requireAuth, requireBillingAuth } from '../middleware/auth';
 import { validate } from '../middleware/validate';
-import { createBill, listBills, getBill, getAnalytics, validateVoucher, createBillSchema } from '../controllers/billController';
+import { createBill, listBills, getBill, getAnalytics, validateVoucher, createBillSchema, getStaffStats } from '../controllers/billController';
 
 const router = Router();
 
 // Owner-only
 router.get('/analytics',        requireAuth, getAnalytics);
+router.get('/staff-stats',      requireAuth, getStaffStats);
 router.get('/',                 requireAuth, listBills);
 router.get('/:id',              requireAuth, getBill);
 

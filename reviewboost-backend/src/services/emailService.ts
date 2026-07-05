@@ -35,6 +35,7 @@ export function sendReceiptEmail(
   reviewSlug?: string,
   reviewToken?: string,
   logoUrl?: string | null,
+  upiQrDataUrl?: string | null,
 ): void {
   const accent = logoColor || '#6366f1';
   const f = (n: number) => `₹${n.toFixed(2)}`;
@@ -129,6 +130,15 @@ export function sendReceiptEmail(
     <div style="color:#111827;font-size:16px;font-weight:800;margin-bottom:6px;">Enjoyed your meal?</div>
     <p style="margin:0 0 18px;color:#6b7280;font-size:13px;line-height:1.6;">A quick review takes 30 seconds and means the world to our team.</p>
     <a href="${reviewUrl}" style="display:inline-block;background:${accent};color:#fff;text-decoration:none;font-weight:700;font-size:14px;padding:12px 28px;border-radius:12px;">Leave a Review →</a>
+  </div>` : ''}
+
+  ${upiQrDataUrl ? `
+  <!-- UPI Payment -->
+  <div style="margin:0 32px 20px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:18px;padding:20px;text-align:center;">
+    <div style="color:#166534;font-size:14px;font-weight:800;margin-bottom:10px;">📱 Pay via UPI</div>
+    <img src="${upiQrDataUrl}" alt="UPI QR Code" width="160" height="160"
+      style="width:160px;height:160px;display:inline-block;border:0;border-radius:8px;" />
+    <p style="margin:8px 0 0;color:#16a34a;font-size:12px;">Scan to pay ₹${grandTotal.toFixed(2)}</p>
   </div>` : ''}
 
   <!-- Footer -->

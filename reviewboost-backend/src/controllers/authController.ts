@@ -58,12 +58,13 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
 });
 
 export const staffLoginSchema = z.object({
-  slug: z.string().min(1),
-  pin:  z.string().regex(/^\d{6}$/, 'PIN must be exactly 6 digits'),
+  slug:      z.string().min(1),
+  pin:       z.string().regex(/^\d{6}$/, 'PIN must be exactly 6 digits'),
+  staffName: z.string().min(1).max(50).trim(),
 });
 
 export const staffLogin = asyncHandler(async (req: Request, res: Response) => {
-  const { slug, pin } = req.body as z.infer<typeof staffLoginSchema>;
+  const { slug, pin, staffName } = req.body as z.infer<typeof staffLoginSchema>;
 
   const restaurant = await Restaurant.findOne({ slug, isActive: true }).select('+billingPin');
   if (!restaurant) throw new AppError('Restaurant not found', 404);
@@ -72,7 +73,7 @@ export const staffLogin = asyncHandler(async (req: Request, res: Response) => {
   const valid = await bcrypt.compare(pin, restaurant.billingPin);
   if (!valid) throw new AppError('Incorrect PIN', 401);
 
-  const token = signStaffToken(restaurant._id.toString());
+  const token = signStaffToken(restaurant._id.toString(), staffName);
 
   res.success({
     token,

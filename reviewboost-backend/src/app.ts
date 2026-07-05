@@ -1,4 +1,5 @@
 import './config/env';
+import http from 'http';
 import express from 'express';
 import cors, { CorsOptions } from 'cors';
 import helmet from 'helmet';
@@ -17,10 +18,12 @@ import customerRouter from './routes/customer';
 import voucherRouter from './routes/voucher';
 import menuRouter from './routes/menu';
 import billRouter from './routes/bill';
+import orderRouter from './routes/order';
 import publicRouter from './routes/public';
 import whatsappRouter from './routes/whatsapp';
 import { startScheduler } from './services/schedulerService';
 import { initializeExistingSessions } from './services/whatsappService';
+import { initSocket } from './services/socketService';
 import { errorHandler } from './middleware/errorHandler';
 import { requestId } from './middleware/requestId';
 import { responseHandler } from './middleware/responseHandler';
@@ -42,7 +45,7 @@ const corsOptions: CorsOptions = {
       ? true
       : env.CORS_ORIGIN.split(',').map((o) => o.trim()),
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID'],
   exposedHeaders: ['X-Request-ID'],
   preflightContinue: false,
@@ -104,6 +107,7 @@ app.use('/api/customers', customerRouter);
 app.use('/api/voucher', voucherRouter);
 app.use('/api/menu', menuRouter);
 app.use('/api/bills', billRouter);
+app.use('/api/orders', orderRouter);
 app.use('/api/public',    publicRouter);
 app.use('/api/whatsapp', whatsappRouter);
 
@@ -120,14 +124,16 @@ if (require.main === module) {
   connectDB()
     .then(() => seedAdmin())
     .then(() => {
-      const server = app.listen(env.PORT, () => {
+      const httpServer = http.createServer(app);
+      initSocket(httpServer);
+      httpServer.listen(env.PORT, () => {
         logger.info(`ReviewBoost API — port ${env.PORT} [${env.NODE_ENV}]`);
       });
       startScheduler();
       initializeExistingSessions().catch((err: Error) =>
         logger.error('WhatsApp session restore failed', err),
       );
-      registerShutdownHandlers(server);
+      registerShutdownHandlers(httpServer);
     })
     .catch((err: Error) => {
       logger.error('Failed to start server', err);

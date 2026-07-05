@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { z } from 'zod';
 import { Restaurant, BUSINESS_TYPES } from '../models/Restaurant';
+import { MenuItem } from '../models/MenuItem';
 import { asyncHandler } from '../utils/asyncHandler';
 import { generateUniqueSlug } from '../utils/slugify';
 import { sendOwnerInviteEmail } from '../services/emailService';
@@ -10,6 +11,15 @@ export const requestDemoSchema = z.object({
   businessName: z.string().min(2).max(200),
   email:        z.string().email(),
   businessType: z.enum(BUSINESS_TYPES),
+});
+
+// Public menu for customer self-order (table QR)
+export const getPublicMenu = asyncHandler(async (req: Request, res: Response) => {
+  const { slug } = req.params;
+  const restaurant = await Restaurant.findOne({ slug, isActive: true }).select('name logoUrl logoColor slug upiId').lean();
+  if (!restaurant) throw new Error('Restaurant not found');
+  const items = await MenuItem.find({ restaurantId: restaurant._id, isAvailable: true }).lean();
+  res.json({ status: 'success', data: { restaurant, items } });
 });
 
 export const requestDemo = asyncHandler(async (req: Request, res: Response) => {

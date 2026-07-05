@@ -46,6 +46,7 @@ export interface IRestaurant {
   trialEndsAt?: Date;
   isActive: boolean;
   billingPin?: string;
+  upiId?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -84,6 +85,7 @@ const RestaurantSchema = new Schema<IRestaurantDocument>(
     trialEndsAt:  { type: Date },
     isActive:     { type: Boolean, default: true },
     billingPin:   { type: String, select: false },
+    upiId:        { type: String, trim: true },
   },
   { timestamps: true },
 );

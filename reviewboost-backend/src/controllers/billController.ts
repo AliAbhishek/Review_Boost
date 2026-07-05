@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { z } from 'zod';
 import crypto from 'crypto';
+import QRCode from 'qrcode';
 import { Bill } from '../models/Bill';
 import { MenuItem } from '../models/MenuItem';
 import { Restaurant } from '../models/Restaurant';
@@ -143,6 +144,7 @@ export const createBill = asyncHandler(async (req: Request, res: Response) => {
     taxLines,
     totalTax,
     grandTotal,
+    staffName:  req.owner?.staffName,
     ...(voucherApplied  ? { voucherApplied }  : {}),
     ...(emailToken      ? { emailToken }       : {}),
   });
@@ -157,11 +159,19 @@ export const createBill = asyncHandler(async (req: Request, res: Response) => {
     });
   }
 
-  // Auto-add to review pipeline if email provided
+  // Fetch active voucher teaser and review URL (used by both email and WA paths)
+  const activeVoucher = await Voucher.findOne({ restaurantId, isActive: true }).lean();
+  const voucherTeaser = activeVoucher
+    ? { title: activeVoucher.title, discountPercent: activeVoucher.discountPercent }
+    : null;
+  const reviewUrl = emailToken
+    ? `${env.FRONTEND_URL}/r/${restaurant.slug}?token=${emailToken}`
+    : undefined;
+
+  // Email flow: add to review pipeline + send receipt email
   if (customer.email && emailToken) {
     const orderedItems = items.map((i) => i.name).join(', ');
 
-    // Upsert by email — avoids duplicates across multiple visits
     Customer.findOneAndUpdate(
       { restaurantId, email: customer.email },
       {
@@ -172,7 +182,7 @@ export const createBill = asyncHandler(async (req: Request, res: Response) => {
           orderedItems,
           emailToken,
         },
-        $unset:       { emailSentAt: '' },   // re-trigger scheduler for new visit
+        $unset:       { emailSentAt: '' },
         $setOnInsert: { restaurantId },
       },
       { upsert: true },
@@ -180,13 +190,15 @@ export const createBill = asyncHandler(async (req: Request, res: Response) => {
       logger.error(`Failed to upsert customer from bill: ${String(err)}`),
     );
 
-    // Check if restaurant has an active voucher to tease in the receipt email
-    const activeVoucher = await Voucher.findOne({ restaurantId, isActive: true }).lean();
-
-    const voucherTeaser = activeVoucher
-      ? { title: activeVoucher.title, discountPercent: activeVoucher.discountPercent }
-      : null;
-    const reviewUrl = `${env.FRONTEND_URL}/r/${restaurant.slug}?token=${emailToken}`;
+    let upiQrDataUrl: string | null = null;
+    if (restaurant.upiId) {
+      const upiString = `upi://pay?pa=${encodeURIComponent(restaurant.upiId)}&pn=${encodeURIComponent(restaurant.name)}&am=${grandTotal.toFixed(2)}&cu=INR`;
+      upiQrDataUrl = await QRCode.toDataURL(upiString, {
+        width: 320,
+        margin: 1,
+        color: { dark: '#166534', light: '#f0fdf4' },
+      }).catch(() => null);
+    }
 
     sendReceiptEmail(
       customer.name,
@@ -204,8 +216,12 @@ export const createBill = asyncHandler(async (req: Request, res: Response) => {
       restaurant.slug,
       emailToken,
       restaurant.logoUrl,
+      upiQrDataUrl,
     );
+  }
 
+  // WhatsApp: send whenever a phone number is available (independent of email)
+  if (customer.phone) {
     sendWA(
       restaurantId.toString(),
       customer.phone,
@@ -386,4 +402,53 @@ export const getBill = asyncHandler(async (req: Request, res: Response) => {
   }).lean();
   if (!bill) throw new AppError('Bill not found', 404);
   res.success({ bill });
+});
+
+// ─── Staff Performance Stats ──────────────────────────────────────────────────
+
+export const getStaffStats = asyncHandler(async (req: Request, res: Response) => {
+  const restaurantId = req.owner!.restaurantId;
+
+  const period = (req.query.period as string) || 'week';
+  const now = new Date();
+  let from: Date;
+
+  if (period === 'day') {
+    from = new Date(now); from.setHours(0, 0, 0, 0);
+  } else if (period === 'month') {
+    from = new Date(now.getTime() - 29 * 86_400_000);
+  } else {
+    from = new Date(now.getTime() - 6 * 86_400_000);
+  }
+
+  const [billStats, orderStats] = await Promise.all([
+    Bill.aggregate([
+      { $match: { restaurantId, staffName: { $exists: true, $ne: null }, createdAt: { $gte: from } } },
+      {
+        $group: {
+          _id: '$staffName',
+          bills:    { $sum: 1 },
+          revenue:  { $sum: '$grandTotal' },
+          avgBill:  { $avg: '$grandTotal' },
+        },
+      },
+      { $sort: { revenue: -1 } },
+    ]),
+    Bill.aggregate([
+      { $match: { restaurantId, createdAt: { $gte: from } } },
+      { $group: { _id: null, total: { $sum: 1 }, totalRevenue: { $sum: '$grandTotal' } } },
+    ]),
+  ]);
+
+  const totals = orderStats[0] ?? { total: 0, totalRevenue: 0 };
+
+  const staff = billStats.map((s) => ({
+    name:       s._id as string,
+    bills:      s.bills as number,
+    revenue:    Math.round((s.revenue as number) * 100) / 100,
+    avgBill:    Math.round((s.avgBill as number) * 100) / 100,
+    share:      totals.total ? Math.round((s.bills / totals.total) * 100) : 0,
+  }));
+
+  res.success({ staff, period, from: from.toISOString(), totalBills: totals.total, totalRevenue: Math.round(totals.totalRevenue * 100) / 100 });
 });

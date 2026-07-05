@@ -35,6 +35,7 @@ export interface IBill {
   totalTax: number;
   grandTotal: number;          // final amount = subtotal + tax - voucherDiscount
   voucherApplied?: IVoucherApplied;
+  staffName?:   string;
   emailToken?:  string;    // token sent in the review-request email for this bill
   reviewedAt?:  Date;      // set when customer submits review via this bill's token
   createdAt: Date;
@@ -79,6 +80,7 @@ const BillSchema = new Schema<IBillDocument>(
       redemptionId:    { type: Schema.Types.ObjectId, ref: 'VoucherRedemption' },
       customerName:    { type: String },
     },
+    staffName:  { type: String, trim: true },
     emailToken: { type: String, index: true },
     reviewedAt: { type: Date },
   },

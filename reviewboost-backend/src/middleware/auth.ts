@@ -13,6 +13,7 @@ export interface OwnerJwtPayload {
 export interface StaffJwtPayload {
   restaurantId: string;
   role: 'staff';
+  staffName: string;
 }
 
 export interface AdminJwtPayload {
@@ -68,7 +69,12 @@ export function requireBillingAuth(req: Request, _res: Response, next: NextFunct
       next(new AppError('Invalid token role', 403));
       return;
     }
-    req.owner = { id: (payload as OwnerJwtPayload).id ?? '', role: payload.role as 'owner', restaurantId: payload.restaurantId };
+    req.owner = {
+      id: (payload as OwnerJwtPayload).id ?? '',
+      role: payload.role as 'owner',
+      restaurantId: payload.restaurantId,
+      staffName: payload.role === 'staff' ? (payload as StaffJwtPayload).staffName : undefined,
+    };
     next();
   } catch {
     next(new AppError('Invalid or expired token', 401));
@@ -109,9 +115,9 @@ export function signOwnerToken(ownerId: Types.ObjectId, restaurantId: Types.Obje
 }
 
 /** Signs a short-lived JWT for staff / cashier access (billing only). */
-export function signStaffToken(restaurantId: string): string {
+export function signStaffToken(restaurantId: string, staffName: string): string {
   return jwt.sign(
-    { restaurantId, role: 'staff' },
+    { restaurantId, role: 'staff', staffName },
     env.JWT_SECRET,
     { expiresIn: '12h' },
   );

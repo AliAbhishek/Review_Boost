@@ -5,7 +5,7 @@ declare global {
     interface Request {
       requestId: string;
       /** Set by requireAuth (owners) or requireBillingAuth (owners + staff). role may be 'owner' | 'staff'. */
-      owner?: OwnerJwtPayload & { role: string };
+      owner?: OwnerJwtPayload & { role: string; staffName?: string };
       admin?: AdminJwtPayload;
     }
   }

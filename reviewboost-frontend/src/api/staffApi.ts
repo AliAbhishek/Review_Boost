@@ -36,8 +36,8 @@ export interface StaffRestaurant {
 }
 
 export const staffApi = {
-  login: (slug: string, pin: string) =>
+  login: (slug: string, pin: string, staffName: string) =>
     axios
-      .post<Wrapped<{ token: string; restaurant: StaffRestaurant }>>(`${base}/api/auth/staff-login`, { slug, pin })
+      .post<Wrapped<{ token: string; restaurant: StaffRestaurant }>>(`${base}/api/auth/staff-login`, { slug, pin, staffName })
       .then((r) => r.data.data),
 }

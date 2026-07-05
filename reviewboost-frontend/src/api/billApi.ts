@@ -49,6 +49,22 @@ export interface ReviewConversionStats {
   conversionRate: number
 }
 
+export interface StaffStat {
+  name: string
+  bills: number
+  revenue: number
+  avgBill: number
+  share: number
+}
+
+export interface StaffStatsData {
+  staff: StaffStat[]
+  period: string
+  from: string
+  totalBills: number
+  totalRevenue: number
+}
+
 export interface AnalyticsData {
   summary: AnalyticsSummary
   vouchers: VoucherStats
@@ -82,6 +98,11 @@ export const billApi = {
     client
       .get<Wrapped<{ bill: Bill }>>(`/api/bills/${id}`)
       .then((r) => r.data.data.bill),
+
+  staffStats: (period: 'day' | 'week' | 'month' = 'week') =>
+    client
+      .get<Wrapped<StaffStatsData>>(`/api/bills/staff-stats?period=${period}`)
+      .then((r) => r.data.data),
 
   analytics: (period: AnalyticsPeriod, from?: string, to?: string) => {
     const params = new URLSearchParams({ period })

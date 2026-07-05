@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useForm } from 'react-hook-form'
@@ -6,11 +7,11 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import {
   Plus, Search, Copy, QrCode, Edit2, Trash2,
-  Store, Star, CreditCard, TrendingUp, X, Check,
-  ToggleLeft, ToggleRight, UserPlus,
+  Store, Star, CreditCard, ShoppingBag, X, Check,
+  ToggleLeft, ToggleRight, UserPlus, UtensilsCrossed, RefreshCw, Tag, Eye,
 } from 'lucide-react'
 
-import { adminApi } from '@/api/adminApi'
+import { adminApi, type AdminMenuItem } from '@/api/adminApi'
 import AdminLayout from '@/components/Layout/AdminLayout'
 import QRDisplay from '@/components/QRDisplay/QRDisplay'
 import AnimatedCounter from '@/components/ui/AnimatedCounter'
@@ -40,6 +41,7 @@ const editSchema = z.object({
   logoColor:     z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Valid hex color'),
   plan:          z.enum(['trial', 'basic', 'pro']),
   ownerPhone:    z.string(),
+  upiId:         z.string(),
 })
 type EditForm = z.infer<typeof editSchema>
 
@@ -52,16 +54,17 @@ const planStyles: Record<string, { label: string; className: string }> = {
 }
 
 const STAT_CARDS = [
-  { key: 'totalRestaurants', label: 'Businesses',        icon: Store,      color: '#818cf8', glow: 'rgba(99,102,241,0.3)',  prefix: '' },
-  { key: 'totalReviews',     label: 'Reviews Generated', icon: Star,       color: '#c084fc', glow: 'rgba(192,132,252,0.3)', prefix: '' },
-  { key: 'activePlans',      label: 'Active Plans',      icon: CreditCard, color: '#34d399', glow: 'rgba(52,211,153,0.3)',  prefix: '' },
-  { key: 'revenue',          label: 'Revenue',           icon: TrendingUp, color: '#fbbf24', glow: 'rgba(251,191,36,0.3)',  prefix: '₹' },
+  { key: 'totalRestaurants', label: 'Businesses',        icon: Store,        color: '#818cf8', glow: 'rgba(99,102,241,0.3)',  prefix: '' },
+  { key: 'totalReviews',     label: 'Reviews Generated', icon: Star,         color: '#c084fc', glow: 'rgba(192,132,252,0.3)', prefix: '' },
+  { key: 'activePlans',      label: 'Active Plans',      icon: CreditCard,   color: '#34d399', glow: 'rgba(52,211,153,0.3)',  prefix: '' },
+  { key: 'totalOrders',      label: 'Total Orders',      icon: ShoppingBag,  color: '#fbbf24', glow: 'rgba(251,191,36,0.3)',  prefix: '' },
 ]
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function AdminDashboard() {
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
   const [search, setSearch]           = useState('')
   const [filterPlan, setFilterPlan]   = useState('all')
   const [showForm, setShowForm]       = useState(false)
@@ -69,11 +72,13 @@ export default function AdminDashboard() {
   const [qrTarget, setQrTarget]       = useState<Restaurant | null>(null)
   const [copiedSlug, setCopiedSlug]   = useState<string | null>(null)
   const [copiedInvite, setCopiedInvite] = useState<string | null>(null)
+  const [menuTarget, setMenuTarget]   = useState<Restaurant | null>(null)
 
-  const { data: restaurants = [], isLoading } = useQuery({
+  const { data: restaurants = [], isLoading, refetch } = useQuery({
     queryKey: ['admin-restaurants'],
     queryFn: adminApi.getRestaurants,
     select: (data) => (Array.isArray(data) ? data : []),
+    refetchInterval: 60_000,
   })
   const { data: stats } = useQuery({ queryKey: ['admin-stats'], queryFn: adminApi.getStats })
 
@@ -115,22 +120,45 @@ export default function AdminDashboard() {
     setShowForm(true)
   }
 
-  const openEdit = (r: Restaurant) => {
-    editForm.reset({
-      name:            r.name,
-      services:        r.services?.join(', ') ?? '',
-      description:     r.description ?? '',
-      cuisine:         r.cuisine ?? '',
-      city:            r.city ?? '',
-      googleMapsUrl:   r.googleMapsUrl ?? '',
-      googleReviewUrl: r.googleReviewUrl ?? '',
-      zomatoUrl:       r.zomatoUrl ?? '',
-      logoColor:       r.logoColor,
-      plan:            r.plan,
-      ownerPhone:      r.ownerPhone ?? '',
-    })
+  const openEdit = async (r: Restaurant) => {
     setEditTarget(r)
     setShowForm(true)
+    // Fetch fresh data so the form always shows what the owner last saved
+    try {
+      const fresh = await adminApi.getRestaurant(r.slug)
+      const f = fresh.restaurant
+      editForm.reset({
+        name:            f.name,
+        services:        f.services?.join(', ') ?? '',
+        description:     f.description ?? '',
+        cuisine:         f.cuisine ?? '',
+        city:            f.city ?? '',
+        googleMapsUrl:   f.googleMapsUrl ?? '',
+        googleReviewUrl: f.googleReviewUrl ?? '',
+        zomatoUrl:       f.zomatoUrl ?? '',
+        logoColor:       f.logoColor,
+        plan:            f.plan,
+        ownerPhone:      f.ownerPhone ?? '',
+        upiId:           f.upiId ?? '',
+      })
+      setEditTarget(f)
+    } catch {
+      // fallback: use the cached data already set above
+      editForm.reset({
+        name:            r.name,
+        services:        r.services?.join(', ') ?? '',
+        description:     r.description ?? '',
+        cuisine:         r.cuisine ?? '',
+        city:            r.city ?? '',
+        googleMapsUrl:   r.googleMapsUrl ?? '',
+        googleReviewUrl: r.googleReviewUrl ?? '',
+        zomatoUrl:       r.zomatoUrl ?? '',
+        logoColor:       r.logoColor,
+        plan:            r.plan,
+        ownerPhone:      r.ownerPhone ?? '',
+        upiId:           r.upiId ?? '',
+      })
+    }
   }
 
   const onCreateSubmit = (data: CreateForm) => {
@@ -151,6 +179,7 @@ export default function AdminDashboard() {
       logoColor:       data.logoColor,
       plan:            data.plan,
       ownerPhone:      data.ownerPhone || undefined,
+      upiId:           data.upiId || undefined,
     }
     updateMutation.mutate({ id: editTarget._id, data: payload })
   }
@@ -182,7 +211,7 @@ export default function AdminDashboard() {
     totalRestaurants: stats?.totalRestaurants ?? 0,
     totalReviews:     stats?.totalReviews ?? 0,
     activePlans:      stats?.activePlans ?? 0,
-    revenue:          stats?.revenue ?? 0,
+    totalOrders:      stats?.totalOrders ?? 0,
   }
 
   return (
@@ -195,15 +224,24 @@ export default function AdminDashboard() {
             <h1 className="text-2xl font-black text-white">Business Manager</h1>
             <p className="text-sm text-white/30 mt-0.5">Manage all businesses and subscriptions</p>
           </div>
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.97 }}
-            onClick={openCreate}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold text-white btn-gradient-violet"
-          >
-            <Plus className="w-4 h-4" />
-            Add Business
-          </motion.button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => refetch()}
+              title="Refresh data"
+              className="w-9 h-9 rounded-xl flex items-center justify-center text-white/40 hover:text-white/80 hover:bg-white/5 transition-all"
+            >
+              <RefreshCw className="w-4 h-4" />
+            </button>
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.97 }}
+              onClick={openCreate}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold text-white btn-gradient-violet"
+            >
+              <Plus className="w-4 h-4" />
+              Add Business
+            </motion.button>
+          </div>
         </div>
 
         {/* Stats */}
@@ -274,7 +312,7 @@ export default function AdminDashboard() {
               <table className="w-full">
                 <thead>
                   <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                    {['Business', 'Type', 'Plan', 'Status', 'Created', 'Actions'].map((h) => (
+                    {['Business', 'Type', 'Plan', 'Orders', 'Status', 'Created', 'Actions'].map((h) => (
                       <th key={h} className="px-5 py-3.5 text-left text-[11px] font-bold uppercase tracking-widest text-white/25">
                         {h}
                       </th>
@@ -318,6 +356,11 @@ export default function AdminDashboard() {
                         </span>
                       </td>
                       <td className="px-5 py-4">
+                        <span className="text-sm font-bold text-white/60">
+                          {r.orderCount ?? 0}
+                        </span>
+                      </td>
+                      <td className="px-5 py-4">
                         <button onClick={() => toggleStatus(r)} className="transition-transform hover:scale-110">
                           {r.isActive
                             ? <ToggleRight className="w-6 h-6 text-green-400" style={{ filter: 'drop-shadow(0 0 6px rgba(52,211,153,0.6))' }} />
@@ -328,11 +371,13 @@ export default function AdminDashboard() {
                       <td className="px-5 py-4">
                         <div className="flex items-center gap-1">
                           {[
+                            { icon: Eye,            onClick: () => navigate(`/admin/restaurant/${r._id}`), title: 'View full details', color: '#818cf8' },
                             { icon: copiedSlug === r.slug ? Check : Copy,           onClick: () => copyLink(r.slug),     title: 'Copy review link',       color: copiedSlug === r.slug ? '#4ade80' : undefined },
                             { icon: copiedInvite === r._id ? Check : UserPlus,      onClick: () => copyInviteLink(r),    title: 'Copy owner invite link', color: copiedInvite === r._id ? '#4ade80' : '#a78bfa' },
-                            { icon: QrCode,  onClick: () => setQrTarget(r),         title: 'View / Download QR code' },
-                            { icon: Edit2,   onClick: () => openEdit(r),            title: 'Edit' },
-                            { icon: Trash2,  onClick: () => deleteMutation.mutate(r._id), title: 'Delete', danger: true },
+                            { icon: QrCode,          onClick: () => setQrTarget(r),         title: 'View / Download QR code' },
+                            { icon: UtensilsCrossed, onClick: () => setMenuTarget(r),       title: 'View menu items',        color: '#34d399' },
+                            { icon: Edit2,           onClick: () => openEdit(r),             title: 'Edit' },
+                            { icon: Trash2,          onClick: () => deleteMutation.mutate(r._id), title: 'Delete', danger: true },
                           ].map(({ icon: Icon, onClick, title, color, danger }) => (
                             <button
                               key={title}
@@ -352,7 +397,7 @@ export default function AdminDashboard() {
                   ))}
                   {filtered.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="px-5 py-16 text-center text-white/20 text-sm">No businesses found</td>
+                      <td colSpan={7} className="px-5 py-16 text-center text-white/20 text-sm">No businesses found</td>
                     </tr>
                   )}
                 </tbody>
@@ -451,6 +496,7 @@ export default function AdminDashboard() {
                     { name: 'city'      as const, label: 'City',        placeholder: 'Mumbai' },
                     { name: 'cuisine'   as const, label: 'Cuisine / Speciality (optional)', placeholder: 'North Indian' },
                     { name: 'ownerPhone'as const, label: 'Owner Phone',  placeholder: '+91 98765 43210' },
+                    { name: 'upiId'     as const, label: 'UPI Payment ID (optional)', placeholder: 'restaurant@upi' },
                   ].map(({ name, label, placeholder }) => (
                     <DarkField key={name} label={label} error={editForm.formState.errors[name]?.message}>
                       <input {...editForm.register(name)} placeholder={placeholder} className="input-dark" />
@@ -487,6 +533,11 @@ export default function AdminDashboard() {
           </>
         )}
 
+        {/* Menu Modal */}
+        {menuTarget && (
+          <MenuModal restaurant={menuTarget} onClose={() => setMenuTarget(null)} />
+        )}
+
         {/* QR Modal */}
         {qrTarget && (
           <>
@@ -520,5 +571,98 @@ function DarkField({ label, error, children }: { label: string; error?: string; 
       {children}
       {error && <p className="text-red-400 text-xs mt-1">{error}</p>}
     </div>
+  )
+}
+
+function MenuModal({ restaurant, onClose }: { restaurant: Restaurant; onClose: () => void }) {
+  const { data: items = [], isLoading } = useQuery({
+    queryKey: ['admin-menu', restaurant._id],
+    queryFn: () => adminApi.getRestaurantMenu(restaurant._id),
+  })
+
+  const grouped = items.reduce<Record<string, AdminMenuItem[]>>((acc, item) => {
+    if (!acc[item.category]) acc[item.category] = []
+    acc[item.category].push(item)
+    return acc
+  }, {})
+
+  const categories = Object.keys(grouped).sort()
+
+  return (
+    <>
+      <motion.div
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+        className="fixed inset-0 z-40"
+        style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }}
+        onClick={onClose}
+      />
+      <motion.div
+        initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
+        transition={{ type: 'spring', stiffness: 280, damping: 30 }}
+        className="fixed right-0 top-0 h-full w-full max-w-md z-50 flex flex-col overflow-hidden"
+        style={{ background: '#08081a', borderLeft: '1px solid rgba(255,255,255,0.07)' }}
+      >
+        <div className="flex items-center justify-between px-6 py-5 flex-shrink-0" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+          <div>
+            <h2 className="font-black text-white text-lg flex items-center gap-2">
+              <UtensilsCrossed className="w-5 h-5 text-green-400" />
+              {restaurant.name}
+            </h2>
+            <p className="text-xs text-white/30 mt-0.5">{items.length} menu items</p>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 rounded-xl flex items-center justify-center text-white/40 hover:text-white/80 hover:bg-white/5 transition-all">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-hide">
+          {isLoading && (
+            <div className="text-center py-16 text-white/20 text-sm">Loading menu…</div>
+          )}
+          {!isLoading && items.length === 0 && (
+            <div className="text-center py-16 text-white/20 text-sm">No menu items added yet</div>
+          )}
+          {categories.map((cat) => (
+            <div key={cat}>
+              <div className="flex items-center gap-2 mb-3">
+                <Tag className="w-3.5 h-3.5 text-violet-400" />
+                <span className="text-[11px] font-bold uppercase tracking-widest text-violet-400">{cat}</span>
+                <span className="text-[10px] text-white/20">({grouped[cat].length})</span>
+              </div>
+              <div className="space-y-2">
+                {grouped[cat].map((item) => (
+                  <div
+                    key={item._id}
+                    className="flex items-center justify-between rounded-xl px-4 py-3"
+                    style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="w-2 h-2 rounded-full flex-shrink-0"
+                        style={{ background: item.isAvailable ? '#34d399' : '#6b7280' }}
+                      />
+                      <span className="text-sm text-white/80 font-medium">{item.name}</span>
+                    </div>
+                    <div className="flex items-center gap-3 flex-shrink-0">
+                      {item.discountPercent && (
+                        <span className="text-[10px] bg-amber-500/15 text-amber-400 px-2 py-0.5 rounded-full font-bold">
+                          -{item.discountPercent}%
+                        </span>
+                      )}
+                      <div className="text-right">
+                        {item.originalPrice && (
+                          <div className="text-[11px] text-white/25 line-through">₹{item.originalPrice}</div>
+                        )}
+                        <div className="text-sm font-bold text-white/80">₹{item.price}</div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </motion.div>
+    </>
   )
 }
