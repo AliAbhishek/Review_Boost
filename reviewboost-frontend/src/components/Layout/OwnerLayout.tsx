@@ -98,6 +98,7 @@ export default function OwnerLayout({ children, activeTab, onTabChange }: OwnerL
         </div>
 
         {/* Upgrade card */}
+        
         {/* <div className="mx-2.5 mb-2.5 rounded-2xl p-4"
           style={{ background: 'linear-gradient(135deg, #eef2ff, #f5f3ff)', border: '1px solid #e0e7ff' }}>
           <p className="text-xs font-black text-indigo-900 mb-0.5">Upgrade to Pro</p>
