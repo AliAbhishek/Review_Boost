@@ -441,6 +441,7 @@ ${profile?.logoUrl ? `<img class="logo" src="${profile.logoUrl}" alt="${reviewQR
       setBillCustomer({ name: '', email: '', phone: '' })
       setVoucherCodeInput('')
       setVoucherValidation(null)
+      setVoucherError(null)
     },
   })
 
@@ -547,8 +548,10 @@ ${profile?.logoUrl ? `<img class="logo" src="${profile.logoUrl}" alt="${reviewQR
     updateMutation.mutate({ taxConfig: data } as Parameters<typeof updateMutation.mutate>[0])
   }
 
+  const billHasContact = !!(billCustomer.email.trim() || billCustomer.phone.trim())
+
   const handleGenerateBill = () => {
-    if (!billCustomer.name.trim() || cart.length === 0) return
+    if (!billCustomer.name.trim() || !billHasContact || cart.length === 0) return
     createBillMutation.mutate({
       customer: { name: billCustomer.name, email: billCustomer.email || undefined, phone: billCustomer.phone || undefined },
       items: cart.map((c) => ({ name: c.name, price: c.price, quantity: c.quantity })),
@@ -1107,7 +1110,7 @@ ${profile?.logoUrl ? `<img class="logo" src="${profile.logoUrl}" alt="${reviewQR
 
                       <button
                         onClick={handleGenerateBill}
-                        disabled={!billCustomer.name.trim() || cart.length === 0 || createBillMutation.isPending}
+                        disabled={!billCustomer.name.trim() || !billHasContact || cart.length === 0 || createBillMutation.isPending}
                         className="mt-4 w-full py-4 bg-indigo-600 text-white text-sm font-bold rounded-xl hover:bg-indigo-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 lg:py-3.5"
                       >
                         <Receipt className="w-4 h-4" />
@@ -1117,7 +1120,11 @@ ${profile?.logoUrl ? `<img class="logo" src="${profile.logoUrl}" alt="${reviewQR
                           return (pre - disc).toFixed(0)
                         })()}` : ''}`}
                       </button>
-                      {!billCustomer.name.trim() && <p className="text-xs text-amber-500 text-center mt-1.5">Enter customer name to proceed</p>}
+                      {(!billCustomer.name.trim() || !billHasContact) && cart.length > 0 && (
+                        <p className="text-xs text-amber-500 text-center mt-1.5">
+                          {!billCustomer.name.trim() ? 'Enter customer name' : 'Enter email or phone'} to proceed
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>

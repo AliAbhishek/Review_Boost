@@ -607,7 +607,12 @@ function StaffBilling({ restaurant, staffName, onLogout }: { restaurant: StaffRe
         orderedBy: 'staff',
         items: cart.map((c) => ({ menuItemId: c.menuItemId, name: c.name, price: c.price, quantity: c.quantity })),
       }),
-    onSuccess: () => setKitchenSent(true),
+    onSuccess: (newOrder) => {
+      setKitchenSent(true)
+      queryClient.setQueryData<Order[]>(['waiter-orders', restaurant.id, staffName], (prev = []) =>
+        [newOrder, ...prev]
+      )
+    },
   })
 
   const addToCart = (item: MenuItem) => {

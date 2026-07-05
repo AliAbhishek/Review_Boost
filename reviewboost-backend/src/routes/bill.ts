@@ -5,14 +5,14 @@ import { createBill, listBills, getBill, getAnalytics, validateVoucher, createBi
 
 const router = Router();
 
-// Owner-only
+// Specific literal routes MUST come before /:id to prevent Express swallowing them
+router.get('/validate-voucher', requireBillingAuth, validateVoucher);
+router.post('/',                requireBillingAuth, validate(createBillSchema), createBill);
+
+// Owner-only routes
 router.get('/analytics',        requireAuth, getAnalytics);
 router.get('/staff-stats',      requireAuth, getStaffStats);
 router.get('/',                 requireAuth, listBills);
 router.get('/:id',              requireAuth, getBill);
-
-// Staff + owner (cashier needs to create bills and validate vouchers)
-router.get('/validate-voucher', requireBillingAuth, validateVoucher);
-router.post('/',                requireBillingAuth, validate(createBillSchema), createBill);
 
 export default router;
