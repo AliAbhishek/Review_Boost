@@ -17,12 +17,23 @@ async function deliver(payload: EmailPayload): Promise<void> {
     return;
   }
 
+  logger.info(`[EmailQueue] SMTP config: host=${env.SMTP_HOST} port=${env.SMTP_PORT} user=${env.SMTP_USER} from="${env.SMTP_FROM}"`);
+
   const transporter = nodemailer.createTransport({
     host: env.SMTP_HOST,
     port: env.SMTP_PORT,
     secure: env.SMTP_PORT === 465,
     auth: { user: env.SMTP_USER, pass: env.SMTP_PASS },
   });
+
+  try {
+    await transporter.verify();
+    logger.info(`[EmailQueue] SMTP connection verified OK`);
+  } catch (verifyErr) {
+    const msg = verifyErr instanceof Error ? verifyErr.message : String(verifyErr)
+    logger.error(`[EmailQueue] SMTP verify failed: ${msg}`)
+    throw verifyErr
+  }
 
   await transporter.sendMail({ from: env.SMTP_FROM, ...payload });
 }
@@ -45,12 +56,15 @@ async function processJob(job: QueueJob): Promise<void> {
     await deliver(job.payload);
     logger.info(`[EmailQueue] Delivered "${job.payload.subject}" → ${job.payload.to} (attempt ${job.attempt})`);
   } catch (err) {
+    const errMsg = err instanceof Error ? err.message : String(err)
+    const errCode = (err as { code?: string; responseCode?: number; response?: string }).code
+    const errResponse = (err as { response?: string }).response
     if (job.attempt < job.maxAttempts) {
       const delay = BASE_DELAY_MS * Math.pow(2, job.attempt - 1);
-      logger.warn(`[EmailQueue] Attempt ${job.attempt}/${job.maxAttempts} failed for ${job.payload.to}. Retry in ${delay}ms`);
+      logger.warn(`[EmailQueue] Attempt ${job.attempt}/${job.maxAttempts} failed for ${job.payload.to}. Error: ${errMsg}${errCode ? ` (code: ${errCode})` : ''}${errResponse ? ` | SMTP response: ${errResponse}` : ''}. Retry in ${delay}ms`);
       setTimeout(() => { queue.push({ ...job, attempt: job.attempt + 1 }); drain(); }, delay);
     } else {
-      logger.error(`[EmailQueue] Permanently failed "${job.payload.subject}" → ${job.payload.to} after ${job.maxAttempts} attempts`);
+      logger.error(`[EmailQueue] Permanently failed "${job.payload.subject}" → ${job.payload.to} after ${job.maxAttempts} attempts. Final error: ${errMsg}${errCode ? ` (code: ${errCode})` : ''}${errResponse ? ` | SMTP response: ${errResponse}` : ''}`);
     }
   }
 }
