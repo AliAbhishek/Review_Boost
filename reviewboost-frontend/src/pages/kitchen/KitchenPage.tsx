@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ChefHat, Clock, Loader2, Bell } from 'lucide-react'
@@ -161,6 +161,14 @@ export default function KitchenPage() {
   const [restaurantName, setRestaurantName] = useState('')
   const [newAlert, setNewAlert] = useState(false)
   const [billedDate, setBilledDate] = useState(() => new Date().toISOString().slice(0, 10))
+  const [mobileCol, setMobileCol] = useState<'new' | 'preparing' | 'ready' | 'billed'>('new')
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768)
+
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 768)
+    window.addEventListener('resize', handler)
+    return () => window.removeEventListener('resize', handler)
+  }, [])
   const qc = useQueryClient()
 
   const { data: orders = [], isLoading } = useQuery({
@@ -267,14 +275,49 @@ export default function KitchenPage() {
         {isLoading && <Loader2 size={20} color="#6b7280" className="animate-spin" />}
       </div>
 
+      {/* Mobile column tabs */}
+      {isMobile && (
+        <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+          {([
+            { id: 'new',       emoji: '🔔', label: 'New',     count: pending.length,    accent: '#dc2626' },
+            { id: 'preparing', emoji: '🍳', label: 'Prep',    count: preparing.length,  accent: '#d97706' },
+            { id: 'ready',     emoji: '✅', label: 'Ready',   count: ready.length,      accent: '#059669' },
+            { id: 'billed',    emoji: '✓',  label: 'Billed',  count: billedToday.length, accent: '#4b5563' },
+          ] as const).map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setMobileCol(tab.id)}
+              style={{
+                flex: 1,
+                padding: '8px 4px',
+                borderRadius: 12,
+                border: `2px solid ${mobileCol === tab.id ? tab.accent : '#374151'}`,
+                background: mobileCol === tab.id ? tab.accent + '22' : 'transparent',
+                color: mobileCol === tab.id ? tab.accent : '#6b7280',
+                fontWeight: 700,
+                fontSize: 11,
+                cursor: 'pointer',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: 2,
+              }}
+            >
+              <span style={{ fontSize: 16 }}>{tab.emoji}</span>
+              <span>{tab.label}{tab.count > 0 ? ` (${tab.count})` : ''}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Columns */}
       <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-        {col('New Orders', pending, '#dc2626')}
-        {col('Preparing', preparing, '#d97706')}
-        {col('Ready', ready, '#059669')}
+        {(!isMobile || mobileCol === 'new')       && col('New Orders', pending, '#dc2626')}
+        {(!isMobile || mobileCol === 'preparing') && col('Preparing', preparing, '#d97706')}
+        {(!isMobile || mobileCol === 'ready')     && col('Ready', ready, '#059669')}
 
         {/* Billed — transparency column with date filter */}
-        <div style={{ flex: 1, minWidth: 280, display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {(!isMobile || mobileCol === 'billed') && <div style={{ flex: 1, minWidth: 280, display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingBottom: 12, borderBottom: '3px solid #4b5563' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <span style={{ fontSize: 22 }}>✓</span>
@@ -340,7 +383,7 @@ export default function KitchenPage() {
               </motion.div>
             )}
           </AnimatePresence>
-        </div>
+        </div>}
       </div>
     </div>
   )

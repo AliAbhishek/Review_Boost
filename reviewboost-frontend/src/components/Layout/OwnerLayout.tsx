@@ -148,14 +148,15 @@ export default function OwnerLayout({ children, activeTab, onTabChange }: OwnerL
       {/* ── Mobile bottom tab bar ─────────────────────────────────────── */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-20 bg-white border-t border-gray-100"
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
-        <div className="flex">
+        <div className="flex overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
           {OWNER_TABS.map(({ id, label, icon: Icon }) => {
             const isActive = activeTab === id
             return (
               <button
                 key={id}
                 onClick={() => onTabChange(id)}
-                className="flex-1 flex flex-col items-center justify-center py-2.5 gap-1 relative min-w-0"
+                className="flex-shrink-0 flex flex-col items-center justify-center py-2.5 gap-1 relative"
+                style={{ minWidth: 72 }}
               >
                 {isActive && (
                   <motion.div
