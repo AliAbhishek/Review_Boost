@@ -1,8 +1,8 @@
-import nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 import { env } from '../config/env';
 import { logger } from '../utils/logger';
 
-// ─── Transport (raw SMTP — only called by the queue worker) ──────────────────
+// ─── Delivery via Resend HTTP API (no SMTP socket needed) ────────────────────
 export interface EmailPayload {
   to: string;
   subject: string;
@@ -12,30 +12,27 @@ export interface EmailPayload {
 async function deliver(payload: EmailPayload): Promise<void> {
   if (env.NODE_ENV === 'test') return;
 
-  if (!env.SMTP_USER || !env.SMTP_PASS) {
-    logger.warn(`[EmailQueue] SMTP not configured — skipping "${payload.subject}" → ${payload.to}`);
+  if (!env.RESEND_API_KEY) {
+    logger.warn(`[EmailQueue] RESEND_API_KEY not set — skipping "${payload.subject}" → ${payload.to}`);
     return;
   }
 
-  logger.info(`[EmailQueue] SMTP config: host=${env.SMTP_HOST} port=${env.SMTP_PORT} user=${env.SMTP_USER} from="${env.SMTP_FROM}"`);
+  logger.info(`[EmailQueue] Sending via Resend: from="${env.SMTP_FROM}" to=${payload.to}`);
 
-  const transporter = nodemailer.createTransport({
-    host: env.SMTP_HOST,
-    port: env.SMTP_PORT,
-    secure: env.SMTP_PORT === 465,
-    auth: { user: env.SMTP_USER, pass: env.SMTP_PASS },
+  const resend = new Resend(env.RESEND_API_KEY);
+  const { data, error } = await resend.emails.send({
+    from: env.SMTP_FROM,
+    to: payload.to,
+    subject: payload.subject,
+    html: payload.html,
   });
 
-  try {
-    await transporter.verify();
-    logger.info(`[EmailQueue] SMTP connection verified OK`);
-  } catch (verifyErr) {
-    const msg = verifyErr instanceof Error ? verifyErr.message : String(verifyErr)
-    logger.error(`[EmailQueue] SMTP verify failed: ${msg}`)
-    throw verifyErr
+  if (error) {
+    logger.error(`[EmailQueue] Resend API error: ${JSON.stringify(error)}`);
+    throw new Error(error.message);
   }
 
-  await transporter.sendMail({ from: env.SMTP_FROM, ...payload });
+  logger.info(`[EmailQueue] Resend accepted: id=${data?.id}`);
 }
 
 // ─── Queue ───────────────────────────────────────────────────────────────────

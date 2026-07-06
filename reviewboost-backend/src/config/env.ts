@@ -24,12 +24,14 @@ const envSchema = z.object({
     .enum(['error', 'warn', 'info', 'http', 'debug'])
     .default('info'),
   CORS_ORIGIN: z.string().default('*'),
-  // Email (SMTP)
-  SMTP_HOST: z.string().default('smtp.gmail.com'),
+  // Email — Resend HTTP API
+  RESEND_API_KEY: z.string().default(''),
+  SMTP_FROM: z.string().default('ReviewBoost <onboarding@resend.dev>'),
+  // Legacy SMTP fields kept so existing .env files don't break
+  SMTP_HOST: z.string().default(''),
   SMTP_PORT: z.string().default('587').transform(Number),
   SMTP_USER: z.string().default(''),
   SMTP_PASS: z.string().default(''),
-  SMTP_FROM: z.string().default('ReviewBoost <noreply@reviewboost.in>'),
   // Frontend base URL — used for invite links in emails
   FRONTEND_URL: z.string().default('http://localhost:5173'),
   // Cloudinary — logo uploads
